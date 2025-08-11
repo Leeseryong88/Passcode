@@ -1,0 +1,5 @@
+{
+  "name": "Crypto Puzzle Quest",
+  "description": "A web service where users solve image-based puzzles to earn rewards in the form of Metamask wallet recovery keys. Test your skills, solve the puzzles, and claim your crypto!",
+  "requestFramePermissions": []
+}
