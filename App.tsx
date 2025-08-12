@@ -7,6 +7,7 @@ import { LoaderCircle } from 'lucide-react';
 import SupportCard from './components/SupportCard';
 import { useTranslation } from 'react-i18next';
 import FilterControls from './components/FilterControls';
+import { Analytics } from '@vercel/analytics/react';
 
 type FilterType = 'all' | 'solved' | 'unsolved';
 
@@ -78,6 +79,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100">
+      <Analytics />
       <Header />
       <main className="container mx-auto px-4 py-8">
         <FilterControls 
