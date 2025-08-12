@@ -8,13 +8,14 @@ import { useTranslation } from 'react-i18next';
 
 interface PuzzleCardProps {
   puzzle: PublicPuzzle;
+  isSolved: boolean;
+  onSolve: () => void;
 }
 
-const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle }) => {
+const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) => {
   const { t } = useTranslation();
   const [guess, setGuess] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [isSolved, setIsSolved] = useState(puzzle.isSolved || false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -32,7 +33,7 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle }) => {
 
     try {
       const result = await checkPuzzleAnswer(puzzle.id, guess) as any;
-      setIsSolved(true);
+      onSolve();
       if (result.type === 'metamask') {
         setRecoveryPhrase(result.recoveryPhrase);
         setIsModalOpen(true);

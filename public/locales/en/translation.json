@@ -43,5 +43,10 @@
   "image": "Image",
   "reveal_image": "View Reward Image",
   "reenter_answer": "Re-enter Answer",
-  "reenter_guidance": "Re-enter the correct answer to view the reward again."
+  "reenter_guidance": "Re-enter the correct answer to view the reward again.",
+  "all_puzzles": "All Puzzles",
+  "solved_puzzles": "Solved Puzzles",
+  "unsolved_puzzles": "Unsolved Puzzles",
+  "filter_by_level": "Filter by Level",
+  "all_levels": "All Levels"
 }
