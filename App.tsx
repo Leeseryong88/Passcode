@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, useMemo } from 'react';
+import React, { useState, useEffect, Suspense, useMemo, useCallback } from 'react';
 import type { PublicPuzzle } from './types';
 import PuzzleCard from './components/PuzzleCard';
 import Header from './components/Header';
@@ -15,45 +15,31 @@ const App: React.FC = () => {
   const [puzzles, setPuzzles] = useState<PublicPuzzle[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [solvedPuzzles, setSolvedPuzzles] = useState<number[]>(() => {
-    try {
-      const saved = localStorage.getItem('solvedPuzzles');
-      return saved ? JSON.parse(saved) : [];
-    } catch (error) {
-      console.error("Failed to parse solvedPuzzles from localStorage", error);
-      return [];
-    }
-  });
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [selectedLevel, setSelectedLevel] = useState<number | 'all'>('all');
 
-  useEffect(() => {
-    localStorage.setItem('solvedPuzzles', JSON.stringify(solvedPuzzles));
-  }, [solvedPuzzles]);
-
-  useEffect(() => {
-    const fetchPuzzles = async () => {
-      try {
-        setIsLoading(true);
-        const fetchedPuzzles = await getPublicPuzzles();
-        const validPuzzles = fetchedPuzzles.filter(p => p.imageUrl);
-        setPuzzles(validPuzzles);
-        setError(null);
-      } catch (err) {
-        setError(t('failed_to_load_puzzles'));
-        if (import.meta.env.DEV) console.error(err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchPuzzles();
+  const fetchPuzzles = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const fetchedPuzzles = await getPublicPuzzles();
+      const validPuzzles = fetchedPuzzles.filter(p => p.imageUrl);
+      setPuzzles(validPuzzles);
+      setError(null);
+    } catch (err) {
+      setError(t('failed_to_load_puzzles'));
+      if (import.meta.env.DEV) console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
   }, [t]);
 
-  const handleSolve = (puzzleId: number) => {
-    if (!solvedPuzzles.includes(puzzleId)) {
-      setSolvedPuzzles(prev => [...prev, puzzleId]);
-    }
+  useEffect(() => {
+    fetchPuzzles();
+  }, [fetchPuzzles]);
+
+  const handleSolve = () => {
+    // Refetch puzzles to get the updated isSolved status
+    fetchPuzzles();
   };
 
   const levels = useMemo(() => {
@@ -65,14 +51,14 @@ const App: React.FC = () => {
     return puzzles.filter(puzzle => {
       const solveStatusFilter = 
         activeFilter === 'all' ||
-        (activeFilter === 'solved' && solvedPuzzles.includes(puzzle.id)) ||
-        (activeFilter === 'unsolved' && !solvedPuzzles.includes(puzzle.id));
+        (activeFilter === 'solved' && puzzle.isSolved) ||
+        (activeFilter === 'unsolved' && !puzzle.isSolved);
 
       const levelFilter = selectedLevel === 'all' || puzzle.level === selectedLevel;
 
       return solveStatusFilter && levelFilter;
     });
-  }, [puzzles, activeFilter, selectedLevel, solvedPuzzles]);
+  }, [puzzles, activeFilter, selectedLevel]);
 
   const handleFilterChange = (filter: FilterType) => {
     setActiveFilter(filter);
@@ -120,8 +106,8 @@ const App: React.FC = () => {
               <PuzzleCard 
                 key={puzzle.id} 
                 puzzle={puzzle} 
-                isSolved={solvedPuzzles.includes(puzzle.id)}
-                onSolve={() => handleSolve(puzzle.id)}
+                isSolved={puzzle.isSolved || false}
+                onSolve={handleSolve}
               />
             ))}
             <SupportCard 
