@@ -7,17 +7,50 @@ const admin = require("firebase-admin");
 // Initialize Firebase Admin SDK
 admin.initializeApp();
 const db = admin.firestore();
+function getDefaultBucket() {
+    var _a;
+    const configured = (_a = admin.app().options) === null || _a === void 0 ? void 0 : _a.storageBucket;
+    const projectId = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT;
+    const fallback = projectId ? `${projectId}.appspot.com` : undefined;
+    return admin.storage().bucket(configured || fallback);
+}
+function extractStoragePath(value) {
+    if (!value)
+        return null;
+    const v = String(value);
+    // Match firebase public URL: .../o/<object>?...
+    let m = v.match(/\/o\/([^?]+)/);
+    if (m && m[1])
+        return decodeURIComponent(m[1]);
+    // Match storage.googleapis.com/<bucket>/<object>
+    m = v.match(/storage\.googleapis\.com\/(?:[^/]+)\/(.+)$/);
+    if (m && m[1])
+        return decodeURIComponent(m[1]);
+    // Match gs://<bucket>/<object>
+    m = v.match(/^gs:\/\/[^/]+\/(.+)$/);
+    if (m && m[1])
+        return decodeURIComponent(m[1]);
+    // Direct path
+    if (/^(puzzles|rewards)\//.test(v))
+        return v;
+    return null;
+}
 /**
  * Fetches all puzzles' public data.
  */
 exports.getPuzzles = functions.https.onCall(async (_data, _context) => {
     try {
-        const snapshot = await db.collection("puzzles").orderBy("level", "asc").get();
+        const snapshot = await db.collection("puzzles")
+            .where("isPublished", "==", true)
+            .orderBy("level", "asc")
+            .get();
         const puzzles = snapshot.docs.map((doc) => {
             const puzzleData = doc.data();
             delete puzzleData.answer;
             delete puzzleData.recoveryPhrase;
             delete puzzleData.revealImageUrl;
+            delete puzzleData.imagePath;
+            delete puzzleData.revealImagePath;
             return puzzleData;
         });
         return puzzles;
@@ -51,6 +84,7 @@ exports.checkAnswer = functions.https.onCall(async (data, _context) => {
                 return { type: 'metamask', recoveryPhrase: puzzle.recoveryPhrase };
             }
             else {
+                // Return stored URL directly. Ensure Storage rules permit public read for rewards/**.
                 return { type: 'image', revealImageUrl: puzzle.revealImageUrl };
             }
         }
@@ -106,7 +140,7 @@ exports.getAllPuzzlesAdmin = functions.https.onCall(async (_data, context) => {
  * @param {functions.https.CallableContext} context - Callable context for auth/claims
  */
 exports.createPuzzleAdmin = functions.https.onCall(async (data, context) => {
-    var _a;
+    var _a, _b;
     assertIsAdmin(context);
     try {
         const baseRequired = ["id", "level", "imageUrl", "rewardAmount", "answer", "rewardType"];
@@ -141,8 +175,10 @@ exports.createPuzzleAdmin = functions.https.onCall(async (data, context) => {
             id: Number(data.id),
             level: Number(data.level),
             imageUrl: String(data.imageUrl),
+            imagePath: data.imagePath ? String(data.imagePath) : undefined,
             rewardAmount: String(data.rewardAmount),
             isSolved: Boolean((_a = data.isSolved) !== null && _a !== void 0 ? _a : false),
+            isPublished: Boolean((_b = data.isPublished) !== null && _b !== void 0 ? _b : false),
             answer: String(data.answer),
             rewardType,
         };
@@ -153,6 +189,7 @@ exports.createPuzzleAdmin = functions.https.onCall(async (data, context) => {
         }
         else if (rewardType === 'image') {
             puzzleDoc.revealImageUrl = String(data.revealImageUrl);
+            puzzleDoc.revealImagePath = data.revealImagePath ? String(data.revealImagePath) : undefined;
             // Optional fields may be empty in this mode
             if (data.walletaddress)
                 puzzleDoc.walletaddress = String(data.walletaddress);
@@ -186,16 +223,20 @@ exports.updatePuzzleAdmin = functions.https.onCall(async (data, context) => {
         }
         const ref = snapshot.docs[0].ref;
         const updatableFields = [
+            "id",
             "level",
             "imageUrl",
+            "imagePath",
             "walletaddress",
             "rewardAmount",
             "explorerLink",
             "isSolved",
+            "isPublished",
             "answer",
             "recoveryPhrase",
             "rewardType",
             "revealImageUrl",
+            "revealImagePath",
         ];
         const updatePayload = {};
         for (const field of updatableFields) {
@@ -231,7 +272,26 @@ exports.deletePuzzleAdmin = functions.https.onCall(async (data, context) => {
         if (snapshot.empty) {
             throw new functions.https.HttpsError("not-found", "Puzzle not found.");
         }
-        await snapshot.docs[0].ref.delete();
+        const doc = snapshot.docs[0];
+        const puzzle = doc.data();
+        // Try to delete associated Storage files
+        const bucket = getDefaultBucket();
+        const candidates = [
+            extractStoragePath(puzzle.imagePath) || extractStoragePath(puzzle.imageUrl),
+            extractStoragePath(puzzle.revealImagePath) || extractStoragePath(puzzle.revealImageUrl),
+        ];
+        for (const path of candidates) {
+            if (!path)
+                continue;
+            try {
+                await bucket.file(path).delete({ ignoreNotFound: true });
+                functions.logger.info(`Deleted storage object: ${path}`);
+            }
+            catch (err) {
+                functions.logger.warn(`Failed to delete storage object ${path}`, err);
+            }
+        }
+        await doc.ref.delete();
         return { success: true };
     }
     catch (error) {
@@ -272,8 +332,10 @@ exports.setPuzzleSolvedAdmin = functions.https.onCall(async (data, context) => {
  * @param {{email: string, secret: string}} data - Target email and admin secret
  * @param {functions.https.CallableContext} _context - Callable context (unused)
  */
-exports.grantAdminRole = functions.https.onCall(async (data, _context) => {
+exports.grantAdminRole = functions.https.onCall(async (data, context) => {
     var _a;
+    // Require authenticated admin caller AND shared secret
+    assertIsAdmin(context);
     const secretFromEnv = (((_a = functions.config()) === null || _a === void 0 ? void 0 : _a.admin) && functions.config().admin.secret) || "";
     const providedSecret = String((data === null || data === void 0 ? void 0 : data.secret) || "");
     const targetEmail = String((data === null || data === void 0 ? void 0 : data.email) || "").trim().toLowerCase();
