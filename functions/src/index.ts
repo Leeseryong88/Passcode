@@ -35,7 +35,10 @@ function extractStoragePath(value?: string | null): string | null {
  */
 export const getPuzzles = functions.https.onCall(async (_data, _context) => {
   try {
-    const snapshot = await db.collection("puzzles").orderBy("level", "asc").get();
+    const snapshot = await db.collection("puzzles")
+      .where("isPublished", "==", true)
+      .orderBy("level", "asc")
+      .get();
     const puzzles = snapshot.docs.map((doc) => {
       const puzzleData = doc.data();
       delete puzzleData.answer;
@@ -170,6 +173,7 @@ export const createPuzzleAdmin = functions.https.onCall(async (data: any, contex
       imagePath: data.imagePath ? String(data.imagePath) : undefined,
       rewardAmount: String(data.rewardAmount),
       isSolved: Boolean(data.isSolved ?? false),
+      isPublished: Boolean(data.isPublished ?? false),
       answer: String(data.answer),
       rewardType,
     };
@@ -213,6 +217,7 @@ export const updatePuzzleAdmin = functions.https.onCall(async (data: any, contex
     const ref = snapshot.docs[0].ref;
 
     const updatableFields = [
+      "id",
       "level",
       "imageUrl",
       "imagePath",
@@ -220,6 +225,7 @@ export const updatePuzzleAdmin = functions.https.onCall(async (data: any, contex
       "rewardAmount",
       "explorerLink",
       "isSolved",
+      "isPublished",
       "answer",
       "recoveryPhrase",
       "rewardType",

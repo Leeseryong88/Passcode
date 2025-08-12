@@ -1,9 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { auth, isCurrentUserAdmin, onAuthStateChangedListener, signInWithEmailPassword, signOutCurrentUser, storage } from '../firebase';
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { isCurrentUserAdmin, onAuthStateChangedListener, signInWithEmailPassword, signOutCurrentUser } from '../firebase';
 import { uploadImageAdminCallable } from '../firebase';
-import { getAllPuzzlesAdmin, createPuzzleAdmin, updatePuzzleAdmin, deletePuzzleAdmin, setPuzzleSolvedAdmin, grantAdminRole } from '../api/puzzles';
+import { getAllPuzzlesAdmin, createPuzzleAdmin, updatePuzzleAdmin, deletePuzzleAdmin, grantAdminRole } from '../api/puzzles';
 import type { PublicPuzzle } from '../types';
 
 type AdminPuzzle = PublicPuzzle & { answer?: string; recoveryPhrase?: string; docId?: string };
@@ -27,6 +26,7 @@ const AdminApp: React.FC = () => {
     answer: '',
     recoveryPhrase: '',
     isSolved: false,
+    isPublished: false,
     rewardType: 'metamask',
     revealImageUrl: '',
   });
@@ -35,7 +35,7 @@ const AdminApp: React.FC = () => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => {
-        const result = reader.result as string; // data:*/*;base64,....
+        const result = reader.result as string;
         const commaIdx = result.indexOf(',');
         resolve(commaIdx >= 0 ? result.substring(commaIdx + 1) : result);
       };
@@ -45,9 +45,7 @@ const AdminApp: React.FC = () => {
   };
 
   const uploadFileAndGetUrl = async (file: File, pathPrefix: string) => {
-    // Prefer server-side upload to avoid any client CORS/App Check friction
     const base64 = await readFileAsBase64(file);
-    // Generate opaque, hard-to-guess path on client side to preserve original extension
     const ext = (file.name.match(/\.[a-zA-Z0-9]+$/)?.[0] || '').toLowerCase();
     const rand = crypto.getRandomValues(new Uint8Array(16));
     const hex = Array.from(rand).map(b => b.toString(16).padStart(2, '0')).join('');
@@ -57,7 +55,6 @@ const AdminApp: React.FC = () => {
     if (!data?.url) {
       throw new Error('Server upload failed');
     }
-    // Also store the storage path alongside the URL, so deletion can target it precisely
     if (pathPrefix === 'puzzles') {
       setNewPuzzle((s: any) => ({ ...s, imagePath: serverPath }));
     } else if (pathPrefix === 'rewards') {
@@ -120,19 +117,24 @@ const AdminApp: React.FC = () => {
         ...newPuzzle,
         id: Number(newPuzzle.id),
         level: Number(newPuzzle.level),
+        isPublished: Boolean(newPuzzle.isPublished),
       };
       await createPuzzleAdmin(payload);
-      setNewPuzzle({ id: '', level: '', imageUrl: '', walletaddress: '', rewardAmount: '', explorerLink: '', answer: '', recoveryPhrase: '', isSolved: false, rewardType: 'metamask', revealImageUrl: '' });
+      setNewPuzzle({ id: '', level: '', imageUrl: '', walletaddress: '', rewardAmount: '', explorerLink: '', answer: '', recoveryPhrase: '', isSolved: false, isPublished: false, rewardType: 'metamask', revealImageUrl: '' });
       await fetchPuzzles();
     } catch (e: any) {
       setError(e.message || 'Create failed');
     }
   };
 
-  const handleUpdate = async (p: AdminPuzzle) => {
+  const handleUpdate = async (puzzleId: number) => {
     setError(null);
     try {
-      await updatePuzzleAdmin(p);
+      const puzzleToUpdate = puzzles.find(p => p.id === puzzleId);
+      if (!puzzleToUpdate) {
+        throw new Error("Puzzle not found in local state");
+      }
+      await updatePuzzleAdmin(puzzleToUpdate);
       await fetchPuzzles();
     } catch (e: any) {
       setError(e.message || 'Update failed');
@@ -149,13 +151,8 @@ const AdminApp: React.FC = () => {
     }
   };
 
-  const toggleSolved = async (p: AdminPuzzle) => {
-    try {
-      await setPuzzleSolvedAdmin(p.id, !p.isSolved);
-      await fetchPuzzles();
-    } catch (e: any) {
-      setError(e.message || 'Set solved failed');
-    }
+  const handleFieldChange = (id: number, field: string, value: any) => {
+    setPuzzles(prev => prev.map(p => (p.id === id ? { ...p, [field]: value } : p)));
   };
 
   const handleGrantAdmin = async (e: React.FormEvent) => {
@@ -219,9 +216,13 @@ const AdminApp: React.FC = () => {
                     <div className="flex flex-wrap gap-2 items-center justify-between">
                       <div className="font-semibold">#{p.id} L{p.level}</div>
                       <div className="text-sm">{p.isSolved ? t('solved') : t('unsolved')}</div>
+                      <div className="text-sm font-semibold">{p.isPublished ? 'Published' : 'Unpublished'}</div>
                       <div className="flex gap-2">
-                        <button className="text-sm bg-blue-700 hover:bg-blue-600 px-3 py-1 rounded" onClick={() => toggleSolved(p)}>
+                        <button className="text-sm bg-blue-700 hover:bg-blue-600 px-3 py-1 rounded" onClick={() => handleFieldChange(p.id, 'isSolved', !p.isSolved)}>
                           Toggle Solved
+                        </button>
+                        <button className="text-sm bg-yellow-700 hover:bg-yellow-600 px-3 py-1 rounded" onClick={() => handleFieldChange(p.id, 'isPublished', !p.isPublished)}>
+                          Toggle Published
                         </button>
                         <button className="text-sm bg-red-700 hover:bg-red-600 px-3 py-1 rounded" onClick={() => handleDelete(p.id)}>
                           {t('delete')}
@@ -230,39 +231,39 @@ const AdminApp: React.FC = () => {
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
                       <label className="text-xs opacity-70">Reward Type
-                        <select className="w-full px-2 py-1 bg-gray-800 rounded" value={(p as any).rewardType || 'metamask'} onChange={(e) => setPuzzles(prev => prev.map(x => x.id === p.id ? { ...(x as any), rewardType: e.target.value } : x))}>
+                        <select className="w-full px-2 py-1 bg-gray-800 rounded" value={(p as any).rewardType || 'metamask'} onChange={(e) => handleFieldChange(p.id, 'rewardType', e.target.value)}>
                           <option value="metamask">Metamask</option>
                           <option value="image">Image</option>
                         </select>
                       </label>
                       <label className="text-xs opacity-70">Image URL
-                        <input className="w-full px-2 py-1 bg-gray-800 rounded" value={p.imageUrl} onChange={(e) => setPuzzles(prev => prev.map(x => x.id === p.id ? { ...x, imageUrl: e.target.value } : x))} />
+                        <input className="w-full px-2 py-1 bg-gray-800 rounded" value={p.imageUrl} onChange={(e) => handleFieldChange(p.id, 'imageUrl', e.target.value)} />
                       </label>
                       <label className="text-xs opacity-70">Wallet
-                        <input className="w-full px-2 py-1 bg-gray-800 rounded" value={p.walletaddress} onChange={(e) => setPuzzles(prev => prev.map(x => x.id === p.id ? { ...x, walletaddress: e.target.value } : x))} />
+                        <input className="w-full px-2 py-1 bg-gray-800 rounded" value={p.walletaddress} onChange={(e) => handleFieldChange(p.id, 'walletaddress', e.target.value)} />
                       </label>
                       <label className="text-xs opacity-70">Reward
-                        <input className="w-full px-2 py-1 bg-gray-800 rounded" value={p.rewardAmount} onChange={(e) => setPuzzles(prev => prev.map(x => x.id === p.id ? { ...x, rewardAmount: e.target.value } : x))} />
+                        <input className="w-full px-2 py-1 bg-gray-800 rounded" value={p.rewardAmount} onChange={(e) => handleFieldChange(p.id, 'rewardAmount', e.target.value)} />
                       </label>
                       <label className="text-xs opacity-70">Explorer
-                        <input className="w-full px-2 py-1 bg-gray-800 rounded" value={p.explorerLink} onChange={(e) => setPuzzles(prev => prev.map(x => x.id === p.id ? { ...x, explorerLink: e.target.value } : x))} />
+                        <input className="w-full px-2 py-1 bg-gray-800 rounded" value={p.explorerLink} onChange={(e) => handleFieldChange(p.id, 'explorerLink', e.target.value)} />
                       </label>
                       <label className="text-xs opacity-70">Answer
-                        <input className="w-full px-2 py-1 bg-gray-800 rounded" value={(p as any).answer || ''} onChange={(e) => setPuzzles(prev => prev.map(x => x.id === p.id ? { ...(x as any), answer: e.target.value } : x))} />
+                        <input className="w-full px-2 py-1 bg-gray-800 rounded" value={(p as any).answer || ''} onChange={(e) => handleFieldChange(p.id, 'answer', e.target.value)} />
                       </label>
                       {(p as any).rewardType === 'metamask' && (
                         <label className="text-xs opacity-70">Recovery Phrase
-                          <input className="w-full px-2 py-1 bg-gray-800 rounded" value={(p as any).recoveryPhrase || ''} onChange={(e) => setPuzzles(prev => prev.map(x => x.id === p.id ? { ...(x as any), recoveryPhrase: e.target.value } : x))} />
+                          <input className="w-full px-2 py-1 bg-gray-800 rounded" value={(p as any).recoveryPhrase || ''} onChange={(e) => handleFieldChange(p.id, 'recoveryPhrase', e.target.value)} />
                         </label>
                       )}
                       {(p as any).rewardType === 'image' && (
                         <label className="text-xs opacity-70">Reveal Image URL
-                          <input className="w-full px-2 py-1 bg-gray-800 rounded" value={(p as any).revealImageUrl || ''} onChange={(e) => setPuzzles(prev => prev.map(x => x.id === p.id ? { ...(x as any), revealImageUrl: e.target.value } : x))} />
+                          <input className="w-full px-2 py-1 bg-gray-800 rounded" value={(p as any).revealImageUrl || ''} onChange={(e) => handleFieldChange(p.id, 'revealImageUrl', e.target.value)} />
                         </label>
                       )}
                     </div>
                     <div className="mt-2 flex justify-end">
-                      <button className="text-sm bg-green-700 hover:bg-green-600 px-3 py-1 rounded" onClick={() => handleUpdate(p)}>
+                      <button className="text-sm bg-green-700 hover:bg-green-600 px-3 py-1 rounded" onClick={() => handleUpdate(p.id)}>
                         {t('save')}
                       </button>
                     </div>
@@ -276,6 +277,10 @@ const AdminApp: React.FC = () => {
             <form onSubmit={handleCreate} className="space-y-2">
               <input className="w-full px-3 py-2 bg-gray-700 rounded" placeholder="id" value={newPuzzle.id} onChange={(e) => setNewPuzzle((s: any) => ({ ...s, id: e.target.value }))} />
               <input className="w-full px-3 py-2 bg-gray-700 rounded" placeholder="level" value={newPuzzle.level} onChange={(e) => setNewPuzzle((s: any) => ({ ...s, level: e.target.value }))} />
+              <div className="flex items-center gap-2">
+                <input type="checkbox" id="isPublished" checked={newPuzzle.isPublished} onChange={(e) => setNewPuzzle((s: any) => ({...s, isPublished: e.target.checked}))} />
+                <label htmlFor="isPublished">Publish on create</label>
+              </div>
               <input className="w-full px-3 py-2 bg-gray-700 rounded" placeholder="imageUrl" value={newPuzzle.imageUrl} onChange={(e) => setNewPuzzle((s: any) => ({ ...s, imageUrl: e.target.value }))} />
               <input type="file" accept="image/*" className="w-full" onChange={async (e) => {
                 const file = e.target.files?.[0];

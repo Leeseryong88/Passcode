@@ -8,6 +8,7 @@ export interface PrivatePuzzle {
   rewardAmount: string;
   explorerLink: string;
   isSolved?: boolean;
+  isPublished?: boolean;
   answer: string;
   recoveryPhrase: string;
   // Reward handling
