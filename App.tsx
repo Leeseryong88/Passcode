@@ -15,7 +15,7 @@ const App: React.FC = () => {
   const [puzzles, setPuzzles] = useState<PublicPuzzle[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+  const [activeFilter, setActiveFilter] = useState<FilterType>('unsolved');
   const [selectedLevel, setSelectedLevel] = useState<number | 'all'>('all');
 
   const fetchPuzzles = useCallback(async () => {
