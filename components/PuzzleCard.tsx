@@ -36,6 +36,14 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
 
     try {
       const result = await checkPuzzleAnswer(puzzle.id, guess) as any;
+      // 재입력 모드에서는 보상 재노출 방지: 정답 확인만 수행
+      if (isReentering) {
+        setInfoMessage(t('already_solved_message'));
+        setInfoOpen(true);
+        setIsReentering(false);
+        setGuess('');
+        return;
+      }
       if (result.type === 'metamask') {
         setRecoveryPhrase(result.recoveryPhrase);
         setIsModalOpen(true);
