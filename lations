@@ -1,0 +1,9 @@
+M	App.tsx
+A	components/InfoModal.tsx
+M	components/PuzzleCard.tsx
+M	components/RewardModal.tsx
+M	functions/lib/index.js
+M	functions/lib/index.js.map
+M	functions/src/index.ts
+M	public/locales/en/translation.json
+M	public/locales/ko/translation.json
