@@ -170,20 +170,26 @@ export const createPuzzleAdmin = functions.https.onCall(async (data: any, contex
       id: Number(data.id),
       level: Number(data.level),
       imageUrl: String(data.imageUrl),
-      imagePath: data.imagePath ? String(data.imagePath) : undefined,
       rewardAmount: String(data.rewardAmount),
       isSolved: Boolean(data.isSolved ?? false),
       isPublished: Boolean(data.isPublished ?? false),
       answer: String(data.answer),
       rewardType,
     };
+
+    if (data.imagePath) {
+      puzzleDoc.imagePath = String(data.imagePath);
+    }
+
     if (rewardType === 'metamask') {
       puzzleDoc.walletaddress = String(data.walletaddress);
       puzzleDoc.explorerLink = String(data.explorerLink);
       puzzleDoc.recoveryPhrase = String(data.recoveryPhrase);
     } else if (rewardType === 'image') {
       puzzleDoc.revealImageUrl = String(data.revealImageUrl);
-      puzzleDoc.revealImagePath = data.revealImagePath ? String(data.revealImagePath) : undefined;
+      if (data.revealImagePath) {
+        puzzleDoc.revealImagePath = String(data.revealImagePath);
+      }
       // Optional fields may be empty in this mode
       if (data.walletaddress) puzzleDoc.walletaddress = String(data.walletaddress);
       if (data.explorerLink) puzzleDoc.explorerLink = String(data.explorerLink);

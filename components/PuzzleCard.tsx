@@ -33,7 +33,6 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
 
     try {
       const result = await checkPuzzleAnswer(puzzle.id, guess) as any;
-      onSolve();
       if (result.type === 'metamask') {
         setRecoveryPhrase(result.recoveryPhrase);
         setIsModalOpen(true);
@@ -128,7 +127,7 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
       </div>
       <RewardModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => { setIsModalOpen(false); onSolve(); }}
         recoveryPhrase={recoveryPhrase}
       />
       <ImageModal 
@@ -138,7 +137,7 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
       />
       <ImageModal
         isOpen={isRewardImageModalOpen}
-        onClose={() => setIsRewardImageModalOpen(false)}
+        onClose={() => { setIsRewardImageModalOpen(false); onSolve(); }}
         imageUrl={rewardRevealImageUrl}
       />
     </>

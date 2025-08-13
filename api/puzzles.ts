@@ -34,7 +34,6 @@ export const getPublicPuzzles = async (): Promise<PublicPuzzle[]> => {
  */
 export const checkPuzzleAnswer = async (puzzleId: number, guess: string): Promise<{ type: 'metamask'; recoveryPhrase: string } | { type: 'image'; revealImageUrl: string }> => {
    try {
-    console.log(`Calling checkAnswerCallable with puzzleId: ${puzzleId}, guess: ${guess}`);
     const result = await checkAnswerCallable({ puzzleId, guess });
     return result.data as any;
   } catch (error: any) {
