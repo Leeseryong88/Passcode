@@ -26,6 +26,8 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
   const [isReentering, setIsReentering] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [infoMessage, setInfoMessage] = useState('');
+  const [showAnswer, setShowAnswer] = useState(false);
+  const [answerText, setAnswerText] = useState('');
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -69,6 +71,17 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
     }
   };
 
+  const handleToggleAnswer = async () => {
+    if (!showAnswer) {
+      // 우선 카드 내에 포함된 answer를 사용하고, 없으면 서버에서 조회
+      if (!puzzle.answer) {
+        const ans = await getSolvedAnswer(puzzle.id);
+        if (ans) setAnswerText(ans);
+      }
+    }
+    setShowAnswer((prev) => !prev);
+  };
+
   return (
     <>
       <div className={`bg-gray-800 border ${isSolved ? 'border-green-500/50' : 'border-gray-700'} rounded-xl shadow-lg overflow-hidden transition-all duration-300 transform hover:scale-105 hover:shadow-cyan-500/10`}>
@@ -103,18 +116,25 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
           )}
           
           {isSolved && !isReentering ? (
-            <div className="mt-4 p-4 bg-green-900/50 border border-green-500 rounded-lg text-center space-y-2">
+            <div
+              className="mt-4 p-4 bg-green-900/50 border border-green-500 rounded-lg text-center space-y-2 cursor-pointer select-none"
+              onClick={handleToggleAnswer}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleToggleAnswer(); }}
+            >
               <div className="flex items-center justify-center gap-2 text-green-400">
                 <CheckCircle />
                 <p className="font-semibold">{t('puzzle_solved')}</p>
               </div>
-              {puzzle.answer ? (
+              {showAnswer && (
                 <div className="text-sm">
                   <span className="text-gray-300">정답: </span>
-                  <span className="font-semibold text-green-300 break-words">{puzzle.answer}</span>
+                  <span className="font-semibold text-green-300 break-words">{puzzle.answer || answerText}</span>
                 </div>
-              ) : (
-                <p className="text-sm text-gray-300">{t('reenter_guidance')}</p>
+              )}
+              {!showAnswer && (
+                <p className="text-sm text-gray-300">클릭하면 정답이 표시됩니다.</p>
               )}
             </div>
           ) : (
