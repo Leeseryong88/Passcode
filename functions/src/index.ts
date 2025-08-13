@@ -320,6 +320,69 @@ export const deletePuzzleAdmin = functions.https.onCall(async (data: any, contex
 });
 
 /**
+ * Batch update multiple puzzles by id. Admin only.
+ * @param {{updates: Array<Record<string, unknown>>}} data - Each item must include `id` and fields to update
+ */
+export const updatePuzzlesBatchAdmin = functions.https.onCall(async (data: any, context) => {
+  assertIsAdmin(context);
+  try {
+    const updates = (data?.updates as Array<Record<string, unknown>>) || [];
+    if (!Array.isArray(updates) || updates.length === 0) {
+      throw new functions.https.HttpsError("invalid-argument", "updates must be a non-empty array");
+    }
+    const batch = db.batch();
+    for (const item of updates) {
+      const id = (item as any)?.id;
+      if (typeof id === 'undefined') {
+        throw new functions.https.HttpsError("invalid-argument", "Each update must include id");
+      }
+      const snap = await db.collection("puzzles").where("id", "==", id).limit(1).get();
+      if (snap.empty) continue;
+      const ref = snap.docs[0].ref;
+      const payload: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(item)) {
+        if (k === 'id') continue;
+        payload[k] = v;
+      }
+      if (Object.keys(payload).length > 0) {
+        batch.update(ref, payload);
+      }
+    }
+    await batch.commit();
+    return { success: true };
+  } catch (error) {
+    functions.logger.error("Error in updatePuzzlesBatchAdmin:", error);
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError("internal", "Failed to batch update puzzles.");
+  }
+});
+
+/**
+ * Batch delete puzzles by ids. Admin only.
+ * @param {{ids: number[]}} data
+ */
+export const deletePuzzlesBatchAdmin = functions.https.onCall(async (data: any, context) => {
+  assertIsAdmin(context);
+  try {
+    const ids = (data?.ids as number[]) || [];
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new functions.https.HttpsError("invalid-argument", "ids must be a non-empty array");
+    }
+    const batch = db.batch();
+    for (const id of ids) {
+      const snap = await db.collection("puzzles").where("id", "==", id).limit(1).get();
+      if (snap.empty) continue;
+      batch.delete(snap.docs[0].ref);
+    }
+    await batch.commit();
+    return { success: true };
+  } catch (error) {
+    functions.logger.error("Error in deletePuzzlesBatchAdmin:", error);
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError("internal", "Failed to batch delete puzzles.");
+  }
+});
+/**
  * Sets the solved status for a puzzle by `id`. Admin only.
  * @param {{id: number, isSolved: boolean}} data - Target puzzle id and status
  * @param {functions.https.CallableContext} context - Callable context for auth/claims
