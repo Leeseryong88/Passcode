@@ -2,6 +2,7 @@ import type { PublicPuzzle } from '../types';
 import {
   getPuzzlesCallable,
   checkAnswerCallable,
+  getSolvedAnswerCallable,
   getAllPuzzlesAdminCallable,
   createPuzzleAdminCallable,
   updatePuzzleAdminCallable,
@@ -41,6 +42,15 @@ export const checkPuzzleAnswer = async (puzzleId: number, guess: string): Promis
     // The Firebase Functions SDK provides a detailed error object.
     // The `message` property is suitable for user display.
     throw new Error(error.message || 'An error occurred while checking the answer.');
+  }
+};
+
+export const getSolvedAnswer = async (puzzleId: number): Promise<string | null> => {
+  try {
+    const result = await getSolvedAnswerCallable({ puzzleId });
+    return (result.data as any)?.answer ?? null;
+  } catch {
+    return null;
   }
 };
 

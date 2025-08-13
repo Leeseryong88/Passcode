@@ -52,6 +52,7 @@ const functions = getFunctions(app, 'us-central1');
 // Create callable function references. The name must match the deployed function name.
 export const getPuzzlesCallable = httpsCallable(functions, 'getPuzzles');
 export const checkAnswerCallable = httpsCallable(functions, 'checkAnswer');
+export const getSolvedAnswerCallable = httpsCallable(functions, 'getSolvedAnswer');
 
 // Board callables
 export const getBoardPostsCallable = httpsCallable(functions, 'getBoardPosts');

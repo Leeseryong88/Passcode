@@ -2,14 +2,14 @@ import React, { useState, useEffect, Suspense, useMemo, useCallback } from 'reac
 import type { PublicPuzzle } from './types';
 import PuzzleCard from './components/PuzzleCard';
 import Header from './components/Header';
-import { getPublicPuzzles } from './api/puzzles';
+import { getPublicPuzzles, getSolvedAnswer } from './api/puzzles';
 import { LoaderCircle } from 'lucide-react';
 import SupportCard from './components/SupportCard';
 import { useTranslation } from 'react-i18next';
 import FilterControls from './components/FilterControls';
 import { Analytics } from '@vercel/analytics/react';
 
-type FilterType = 'all' | 'solved' | 'unsolved';
+type FilterType = 'all' | 'solved' | 'unsolved' | 'level';
 
 const App: React.FC = () => {
   const { t } = useTranslation();
@@ -23,12 +23,27 @@ const App: React.FC = () => {
     try {
       setIsLoading(true);
       const fetchedPuzzles = await getPublicPuzzles();
-      // 이미지가 없어도 노출되도록 필터링 제거
-      setPuzzles(fetchedPuzzles);
+      // 해결된 퍼즐인데 목록 응답에 answer가 비어있으면 서버에서 보충 조회
+      const enriched = await Promise.all(
+        fetchedPuzzles.map(async (p) => {
+          if ((p as any).isSolved && !(p as any).answer) {
+            try {
+              const ans = await getSolvedAnswer(p.id);
+              if (ans) {
+                return { ...(p as any), answer: ans } as any;
+              }
+            } catch {
+              // ignore per-item errors
+            }
+          }
+          return p as any;
+        })
+      );
+      setPuzzles(enriched as any);
       setError(null);
     } catch (err) {
       setError(t('failed_to_load_puzzles'));
-      if (import.meta.env.DEV) console.error(err);
+      if ((import.meta as any).env?.DEV) console.error(err);
     } finally {
       setIsLoading(false);
     }

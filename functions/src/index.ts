@@ -409,3 +409,30 @@ export const uploadImageAdmin = functions.https.onCall(async (data: any, context
     throw new functions.https.HttpsError('internal', 'Failed to upload image.');
   }
 });
+
+/**
+ * Returns the answer for a puzzle only if it has already been solved.
+ * This allows clients to display the correct answer on solved cards
+ * even if the initial listing omitted the answer field.
+ */
+export const getSolvedAnswer = functions.https.onCall(async (data: any, _context) => {
+  try {
+    const { puzzleId } = data || {};
+    if (typeof puzzleId === 'undefined') {
+      throw new functions.https.HttpsError('invalid-argument', 'puzzleId is required');
+    }
+    const snapshot = await db.collection('puzzles').where('id', '==', puzzleId).limit(1).get();
+    if (snapshot.empty) {
+      throw new functions.https.HttpsError('not-found', 'Puzzle not found');
+    }
+    const puzzle = snapshot.docs[0].data() as any;
+    if (!puzzle?.isSolved) {
+      throw new functions.https.HttpsError('permission-denied', 'Answer is only available after the puzzle is solved');
+    }
+    return { answer: String(puzzle.answer ?? '') };
+  } catch (error) {
+    functions.logger.error('Error in getSolvedAnswer:', error);
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', 'Failed to get answer');
+  }
+});

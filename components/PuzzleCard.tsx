@@ -4,7 +4,7 @@ import RewardModal from './RewardModal';
 import InfoModal from './InfoModal';
 import ImageModal from './ImageModal';
 import { ExternalLink, CheckCircle, XCircle, Wallet, Puzzle as PuzzleIcon, LoaderCircle } from 'lucide-react';
-import { checkPuzzleAnswer } from '../api/puzzles';
+import { checkPuzzleAnswer, getSolvedAnswer } from '../api/puzzles';
 import { useTranslation } from 'react-i18next';
 
 interface PuzzleCardProps {
@@ -38,7 +38,13 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
       const result = await checkPuzzleAnswer(puzzle.id, guess) as any;
       // 재입력 모드에서는 보상 재노출 방지: 정답 확인만 수행
       if (isReentering) {
-        setInfoMessage(t('already_solved_message'));
+        // 서버에서 정답 조회 시도(해결된 퍼즐만 허용)
+        const ans = await getSolvedAnswer(puzzle.id);
+        if (ans) {
+          setInfoMessage(`${t('already_solved_message')}\n${ans}`);
+        } else {
+          setInfoMessage(t('already_solved_message'));
+        }
         setInfoOpen(true);
         setIsReentering(false);
         setGuess('');
@@ -102,13 +108,14 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
                 <CheckCircle />
                 <p className="font-semibold">{t('puzzle_solved')}</p>
               </div>
-              <p className="text-sm text-gray-300">
-                {puzzle.answer ? (
-                  <span className="font-semibold text-green-300">{puzzle.answer}</span>
-                ) : (
-                  t('reenter_guidance')
-                )}
-              </p>
+              {puzzle.answer ? (
+                <div className="text-sm">
+                  <span className="text-gray-300">정답: </span>
+                  <span className="font-semibold text-green-300 break-words">{puzzle.answer}</span>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-300">{t('reenter_guidance')}</p>
+              )}
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-3">
