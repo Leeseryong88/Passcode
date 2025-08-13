@@ -40,13 +40,19 @@ export const getPuzzles = functions.https.onCall(async (_data, _context) => {
       .orderBy("level", "asc")
       .get();
     const puzzles = snapshot.docs.map((doc) => {
-      const puzzleData = doc.data();
-      delete puzzleData.answer;
-      delete puzzleData.recoveryPhrase;
-      delete puzzleData.revealImageUrl;
-      delete puzzleData.imagePath;
-      delete puzzleData.revealImagePath;
-      return puzzleData;
+      const puzzleData = doc.data() as any;
+      const isSolved = Boolean(puzzleData?.isSolved);
+      const publicData: Record<string, unknown> = { ...puzzleData };
+      // 민감 정보는 항상 제거
+      delete (publicData as any).recoveryPhrase;
+      delete (publicData as any).revealImageUrl;
+      delete (publicData as any).imagePath;
+      delete (publicData as any).revealImagePath;
+      // 정답은 퍼즐이 해결된 경우에만 공개
+      if (!isSolved) {
+        delete (publicData as any).answer;
+      }
+      return publicData;
     });
     return puzzles;
   } catch (error) {

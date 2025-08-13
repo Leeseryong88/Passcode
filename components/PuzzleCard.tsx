@@ -102,13 +102,15 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
                 <CheckCircle />
                 <p className="font-semibold">{t('puzzle_solved')}</p>
               </div>
-              <p className="text-sm text-gray-300">{t('reenter_guidance')}</p>
-              <button
-                onClick={() => { setIsReentering(true); setGuess(''); setError(null); }}
-                className="mt-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg"
-              >
-                {t('reenter_answer')}
-              </button>
+              <p className="text-sm text-gray-300">
+                {t('reenter_guidance')}
+                {puzzle.answer ? (
+                  <>
+                    <br/>
+                    <span className="font-semibold text-green-300">{puzzle.answer}</span>
+                  </>
+                ) : null}
+              </p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-3">
