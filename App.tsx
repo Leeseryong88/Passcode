@@ -23,8 +23,8 @@ const App: React.FC = () => {
     try {
       setIsLoading(true);
       const fetchedPuzzles = await getPublicPuzzles();
-      const validPuzzles = fetchedPuzzles.filter(p => p.imageUrl);
-      setPuzzles(validPuzzles);
+      // 이미지가 없어도 노출되도록 필터링 제거
+      setPuzzles(fetchedPuzzles);
       setError(null);
     } catch (err) {
       setError(t('failed_to_load_puzzles'));

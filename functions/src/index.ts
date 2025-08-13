@@ -64,26 +64,39 @@ export const checkAnswer = functions.https.onCall(async (data: any, _context) =>
       throw new functions.https.HttpsError("invalid-argument", "The function must be called with 'puzzleId' and 'guess' arguments.");
     }
     const {puzzleId, guess} = data;
-    const snapshot = await db.collection("puzzles").where("id", "==", puzzleId).limit(1).get();
-    if (snapshot.empty) {
+    const query = await db.collection("puzzles").where("id", "==", puzzleId).limit(1).get();
+    if (query.empty) {
       throw new functions.https.HttpsError("not-found", "Puzzle not found.");
     }
-    const puzzle = snapshot.docs[0].data() as any;
-    if (guess.trim().toLowerCase() === String(puzzle.answer).toLowerCase()) {
-      if (puzzle.isSolved !== true) {
-        const puzzleRef = snapshot.docs[0].ref;
-        await puzzleRef.update({isSolved: true});
-      }
-      const rewardType = puzzle.rewardType || 'metamask';
-      if (rewardType === 'metamask') {
-        return { type: 'metamask', recoveryPhrase: puzzle.recoveryPhrase };
-      } else {
-        // Return stored URL directly. Ensure Storage rules permit public read for rewards/**.
-        return { type: 'image', revealImageUrl: puzzle.revealImageUrl };
-      }
-    } else {
+    const doc = query.docs[0];
+    const puzzle = doc.data() as any;
+
+    // Validate answer first
+    const isCorrect = guess.trim().toLowerCase() === String(puzzle.answer).toLowerCase();
+    if (!isCorrect) {
       throw new functions.https.HttpsError("unauthenticated", "Incorrect answer. Please try again.");
     }
+
+    // Atomically mark solved only once
+    const firstSolver = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(doc.ref);
+      const d = snap.data() as any;
+      if (!d?.isSolved) {
+        tx.update(doc.ref, { isSolved: true, solvedAt: admin.firestore.FieldValue.serverTimestamp() });
+        return true;
+      }
+      return false;
+    });
+
+    if (!firstSolver) {
+      return { type: 'already_solved' };
+    }
+
+    const rewardType = puzzle.rewardType || 'metamask';
+    if (rewardType === 'metamask') {
+      return { type: 'metamask', recoveryPhrase: puzzle.recoveryPhrase };
+    }
+    return { type: 'image', revealImageUrl: puzzle.revealImageUrl };
   } catch (error) {
     functions.logger.error("!!! CRITICAL ERROR in checkAnswer !!!:", error);
     if (error instanceof functions.https.HttpsError) {

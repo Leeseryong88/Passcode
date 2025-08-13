@@ -45,8 +45,11 @@ const RewardModal: React.FC<RewardModalProps> = ({ isOpen, onClose, recoveryPhra
             </div>
         </div>
 
-        <div className="flex items-center bg-blue-900/40 text-blue-300 p-3 rounded-lg text-sm mb-6">
+        <div className="flex items-center bg-blue-900/40 text-blue-300 p-3 rounded-lg text-sm mb-3">
           <p>{t('reward_modal_guidance')}</p>
+        </div>
+        <div className="flex items-center bg-yellow-900/40 text-yellow-300 p-3 rounded-lg text-sm mb-6">
+          <p>{t('one_time_reveal_warning')}</p>
         </div>
 
         <div className="flex items-center bg-red-900/40 text-red-300 p-3 rounded-lg text-sm mb-6">

@@ -175,13 +175,15 @@ exports.createPuzzleAdmin = functions.https.onCall(async (data, context) => {
             id: Number(data.id),
             level: Number(data.level),
             imageUrl: String(data.imageUrl),
-            imagePath: data.imagePath ? String(data.imagePath) : undefined,
             rewardAmount: String(data.rewardAmount),
             isSolved: Boolean((_a = data.isSolved) !== null && _a !== void 0 ? _a : false),
             isPublished: Boolean((_b = data.isPublished) !== null && _b !== void 0 ? _b : false),
             answer: String(data.answer),
             rewardType,
         };
+        if (data.imagePath) {
+            puzzleDoc.imagePath = String(data.imagePath);
+        }
         if (rewardType === 'metamask') {
             puzzleDoc.walletaddress = String(data.walletaddress);
             puzzleDoc.explorerLink = String(data.explorerLink);
@@ -189,7 +191,9 @@ exports.createPuzzleAdmin = functions.https.onCall(async (data, context) => {
         }
         else if (rewardType === 'image') {
             puzzleDoc.revealImageUrl = String(data.revealImageUrl);
-            puzzleDoc.revealImagePath = data.revealImagePath ? String(data.revealImagePath) : undefined;
+            if (data.revealImagePath) {
+                puzzleDoc.revealImagePath = String(data.revealImagePath);
+            }
             // Optional fields may be empty in this mode
             if (data.walletaddress)
                 puzzleDoc.walletaddress = String(data.walletaddress);

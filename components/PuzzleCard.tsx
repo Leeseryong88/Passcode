@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { PublicPuzzle } from '../types';
 import RewardModal from './RewardModal';
+import InfoModal from './InfoModal';
 import ImageModal from './ImageModal';
 import { ExternalLink, CheckCircle, XCircle, Wallet, Puzzle as PuzzleIcon, LoaderCircle } from 'lucide-react';
 import { checkPuzzleAnswer } from '../api/puzzles';
@@ -23,6 +24,8 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
   const [rewardRevealImageUrl, setRewardRevealImageUrl] = useState('');
   const [isRewardImageModalOpen, setIsRewardImageModalOpen] = useState(false);
   const [isReentering, setIsReentering] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [infoMessage, setInfoMessage] = useState('');
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -39,6 +42,9 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
       } else if (result.type === 'image') {
         setRewardRevealImageUrl(result.revealImageUrl);
         setIsRewardImageModalOpen(true);
+      } else if (result.type === 'already_solved') {
+        setInfoMessage(t('already_solved_message'));
+        setInfoOpen(true);
       }
       setIsReentering(false);
     } catch (err: any) {
@@ -140,6 +146,7 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
         onClose={() => { setIsRewardImageModalOpen(false); onSolve(); }}
         imageUrl={rewardRevealImageUrl}
       />
+      <InfoModal isOpen={infoOpen} onClose={() => setInfoOpen(false)} message={infoMessage} />
     </>
   );
 };
