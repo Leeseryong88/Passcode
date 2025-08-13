@@ -103,13 +103,11 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
                 <p className="font-semibold">{t('puzzle_solved')}</p>
               </div>
               <p className="text-sm text-gray-300">
-                {t('reenter_guidance')}
                 {puzzle.answer ? (
-                  <>
-                    <br/>
-                    <span className="font-semibold text-green-300">{puzzle.answer}</span>
-                  </>
-                ) : null}
+                  <span className="font-semibold text-green-300">{puzzle.answer}</span>
+                ) : (
+                  t('reenter_guidance')
+                )}
               </p>
             </div>
           ) : (
