@@ -181,6 +181,7 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
         isOpen={isRewardImageModalOpen}
         onClose={() => { setIsRewardImageModalOpen(false); onSolve(); }}
         imageUrl={rewardRevealImageUrl}
+        notice={t('one_time_reveal_warning')}
       />
       <InfoModal isOpen={infoOpen} onClose={() => setInfoOpen(false)} message={infoMessage} />
     </>

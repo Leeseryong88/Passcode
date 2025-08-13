@@ -5,9 +5,10 @@ interface ImageModalProps {
   isOpen: boolean;
   onClose: () => void;
   imageUrl: string;
+  notice?: string;
 }
 
-const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, imageUrl }) => {
+const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, imageUrl, notice }) => {
   if (!isOpen) return null;
 
   return (
@@ -26,7 +27,12 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, imageUrl }) =>
         >
           <X className="w-6 h-6" />
         </button>
-        <img src={imageUrl} alt="Puzzle full view" className="max-w-full max-h-[85vh] object-contain" />
+        <img src={imageUrl} alt="Puzzle full view" className="max-w-full max-h-[75vh] object-contain" />
+        {notice && (
+          <div className="mt-4 bg-yellow-900/40 text-yellow-200 text-sm p-3 rounded-md">
+            {notice}
+          </div>
+        )}
       </div>
     </div>
   );
