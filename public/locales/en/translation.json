@@ -50,5 +50,5 @@
   "filter_by_level": "Filter by Level",
   "all_levels": "All Levels",
   "one_time_reveal_warning": "This reward is revealed only once. Please store it securely.",
-  "already_solved_message": "Correct. The first solver has already claimed the reward."
+  "already_solved_message": "This puzzle has already been correctly solved by someone else."
 }
