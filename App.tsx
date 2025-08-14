@@ -118,7 +118,7 @@ const App: React.FC = () => {
         )}
 
           {!isLoading && !error && (
-            <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5 sm:gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
             {filteredPuzzles.map((puzzle) => (
               <PuzzleCard 
                 key={puzzle.id} 

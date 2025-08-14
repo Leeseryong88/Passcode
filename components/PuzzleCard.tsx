@@ -105,18 +105,18 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
         <img 
           src={puzzle.imageUrl} 
           alt={`${t('level')} ${puzzle.level}`} 
-          className="w-full h-40 object-cover cursor-pointer"
+          className="w-full h-36 sm:h-40 object-cover cursor-pointer"
           onClick={() => setIsImageModalOpen(true)}
         />
         <div className="p-4">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-cyan-300 flex items-center gap-2">
-              <PuzzleIcon className="w-5 h-5" /> {t('level')} {puzzle.level}
+            <h2 className="text-base sm:text-lg font-semibold text-cyan-300 flex items-center gap-2">
+              <PuzzleIcon className="w-4 h-4 sm:w-5 sm:h-5" /> {t('level')} {puzzle.level}
             </h2>
-            <span className="text-xs font-semibold bg-yellow-600/20 text-yellow-300 px-2 py-0.5 rounded">{puzzle.rewardAmount}</span>
+            <span className="text-[10px] sm:text-xs font-semibold bg-yellow-600/20 text-yellow-300 px-2 py-0.5 rounded">{puzzle.rewardAmount}</span>
           </div>
           <div className="flex justify-end mb-2">
-            <span className="text-xs font-semibold bg-red-600/20 text-red-300 px-2 py-0.5 rounded">{t('wrong_attempts_count', { count: (puzzle as any).wrongAttempts || 0 })}</span>
+            <span className="text-[10px] sm:text-xs font-semibold bg-red-600/20 text-red-300 px-2 py-0.5 rounded">{t('wrong_attempts_count', { count: (puzzle as any).wrongAttempts || 0 })}</span>
           </div>
           {(!puzzle.rewardType || puzzle.rewardType === 'metamask') && (
             <div className="bg-gray-900/40 p-2 rounded-lg mb-3 space-y-1 text-xs">
@@ -143,10 +143,10 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
             >
               <div className="flex items-center justify-center gap-2 text-green-300">
                 <CheckCircle className="w-4 h-4" />
-                <p className="text-sm font-semibold">{t('puzzle_solved')}</p>
+                <p className="text-xs sm:text-sm font-semibold">{t('puzzle_solved')}</p>
               </div>
               {showAnswer && (
-                <div className="text-sm space-y-1">
+                <div className="text-xs sm:text-sm space-y-1">
                   <div>
                     <span className="text-gray-300">정답: </span>
                     <span className="font-semibold text-green-300 break-words">{puzzle.answer || answerText}</span>
@@ -170,13 +170,13 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
                 value={guess}
                 onChange={(e) => setGuess(e.target.value)}
                 placeholder={t('enter_your_answer')}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-colors text-sm"
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-colors text-xs sm:text-sm"
                 aria-label="Answer input"
                 disabled={isSubmitting}
               />
               <button
                 type="submit"
-                className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-2 px-3 rounded-lg transition-colors duration-300 disabled:bg-gray-600 disabled:cursor-not-allowed flex items-center justify-center text-sm"
+                className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-2 px-3 rounded-lg transition-colors duration-300 disabled:bg-gray-600 disabled:cursor-not-allowed flex items-center justify-center text-xs sm:text-sm"
                 disabled={!guess || isSubmitting}
               >
                 {isSubmitting ? <LoaderCircle className="w-5 h-5 animate-spin" /> : t('submit_answer')}
@@ -185,7 +185,7 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
           )}
 
           {error && (
-             <div className="mt-3 flex items-center gap-2 text-red-400 text-sm p-2 bg-red-900/30 rounded-md">
+             <div className="mt-3 flex items-center gap-2 text-red-400 text-xs sm:text-sm p-2 bg-red-900/30 rounded-md">
                 <XCircle className="w-4 h-4 flex-shrink-0" />
                 <span>{error}</span>
              </div>
