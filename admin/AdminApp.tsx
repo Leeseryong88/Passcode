@@ -116,7 +116,6 @@ const AdminApp: React.FC = () => {
       const payload: any = { ...editDraft };
       // Ensure proper types
       payload.id = Number(payload.id);
-      payload.level = Number(payload.level);
       if (typeof (payload as any).wrongAttempts !== 'undefined') {
         payload.wrongAttempts = Number((payload as any).wrongAttempts);
       }
@@ -258,7 +257,7 @@ const AdminApp: React.FC = () => {
             <form onSubmit={handleCreate} className="space-y-2">
               <input className="w-full px-3 py-2 bg-gray-700 rounded" placeholder="id" value={newPuzzle.id} onChange={(e) => setNewPuzzle((s: any) => ({ ...s, id: e.target.value }))} />
               <div className="flex items-center gap-2">
-                <input type="checkbox" id="isPublished" checked={newPuzzle.isPublished} onChange={(e) => setNewPuzzle((s: any) => ({...s, isPublished: e.target.checked}))} />
+                <input type="checkbox" id="isPublished" checked={Boolean(newPuzzle.isPublished)} onChange={(e) => setNewPuzzle((s: any) => ({...s, isPublished: e.target.checked}))} />
                 <label htmlFor="isPublished">Publish on create</label>
               </div>
               <input className="w-full px-3 py-2 bg-gray-700 rounded" placeholder="imageUrl" value={newPuzzle.imageUrl} onChange={(e) => setNewPuzzle((s: any) => ({ ...s, imageUrl: e.target.value }))} />
@@ -319,7 +318,7 @@ const AdminApp: React.FC = () => {
                   <input className="w-full px-3 py-2 bg-gray-800 rounded opacity-70 cursor-not-allowed" value={String(editDraft.id)} disabled />
                 </label>
                 <label className="text-xs opacity-80">Published
-                  <select className="w-full px-3 py-2 bg-gray-700 rounded" value={String(editDraft.isPublished || false)} onChange={(e) => handleEditFieldChange('isPublished', e.target.value === 'true')}>
+                  <select className="w-full px-3 py-2 bg-gray-700 rounded" value={String(Boolean(editDraft.isPublished))} onChange={(e) => handleEditFieldChange('isPublished', e.target.value === 'true')}>
                     <option value="true">true</option>
                     <option value="false">false</option>
                   </select>

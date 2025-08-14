@@ -42,11 +42,10 @@ exports.getPuzzles = functions.https.onCall(async (_data, _context) => {
     try {
         const snapshot = await db.collection("puzzles")
             .where("isPublished", "==", true)
-            .orderBy("level", "asc")
             .get();
         const puzzles = snapshot.docs.map((doc) => {
             const puzzleData = doc.data();
-            const isSolved = Boolean(puzzleData === null || puzzleData === void 0 ? void 0 : puzzleData.isSolved);
+            const isSolved = Boolean(puzzleData?.isSolved);
             const publicData = Object.assign({}, puzzleData);
             // 민감 정보는 항상 제거
             delete publicData.recoveryPhrase;
@@ -59,6 +58,7 @@ exports.getPuzzles = functions.https.onCall(async (_data, _context) => {
             }
             return publicData;
         });
+        puzzles.sort((a, b) => Number(a.id) - Number(b.id));
         return puzzles;
     }
     catch (error) {
@@ -110,6 +110,13 @@ exports.checkAnswer = functions.https.onCall(async (data, _context) => {
         if (rewardType === 'metamask') {
             return { type: 'metamask', recoveryPhrase: puzzle.recoveryPhrase };
         }
+        if (rewardType === 'image') {
+            return { type: 'image', revealImageUrl: puzzle.revealImageUrl };
+        }
+        if (rewardType === 'text') {
+            return { type: 'text', revealText: String(puzzle.revealText || '') };
+        }
+        // Fallback to image if misconfigured
         return { type: 'image', revealImageUrl: puzzle.revealImageUrl };
     }
     catch (error) {
@@ -145,8 +152,8 @@ function assertIsAdmin(context) {
 exports.getAllPuzzlesAdmin = functions.https.onCall(async (_data, context) => {
     assertIsAdmin(context);
     try {
-        const snapshot = await db.collection("puzzles").orderBy("level", "asc").get();
-        const puzzles = snapshot.docs.map((doc) => (Object.assign({ docId: doc.id }, doc.data())));
+        const snapshot = await db.collection("puzzles").orderBy("id", "asc").get();
+        const puzzles = snapshot.docs.map((doc) => ({ docId: doc.id, ...doc.data() }));
         return puzzles;
     }
     catch (error) {
@@ -163,7 +170,7 @@ exports.createPuzzleAdmin = functions.https.onCall(async (data, context) => {
     var _a, _b;
     assertIsAdmin(context);
     try {
-        const baseRequired = ["id", "level", "imageUrl", "rewardAmount", "answer", "rewardType"];
+        const baseRequired = ["id", "imageUrl", "rewardAmount", "answer", "rewardType"];
         for (const field of baseRequired) {
             if (typeof data[field] === "undefined" || data[field] === null) {
                 throw new functions.https.HttpsError("invalid-argument", `Missing required field: ${field}`);
@@ -183,6 +190,11 @@ exports.createPuzzleAdmin = functions.https.onCall(async (data, context) => {
                 throw new functions.https.HttpsError("invalid-argument", "Missing required field for image reward: revealImageUrl");
             }
         }
+        else if (rewardType === 'text') {
+            if (!data.revealText) {
+                throw new functions.https.HttpsError("invalid-argument", "Missing required field for text reward: revealText");
+            }
+        }
         else {
             throw new functions.https.HttpsError("invalid-argument", "Invalid rewardType. Expected 'metamask' or 'image'.");
         }
@@ -193,11 +205,10 @@ exports.createPuzzleAdmin = functions.https.onCall(async (data, context) => {
         }
         const puzzleDoc = {
             id: Number(data.id),
-            level: Number(data.level),
             imageUrl: String(data.imageUrl),
             rewardAmount: String(data.rewardAmount),
-            isSolved: Boolean((_a = data.isSolved) !== null && _a !== void 0 ? _a : false),
-            isPublished: Boolean((_b = data.isPublished) !== null && _b !== void 0 ? _b : false),
+            isSolved: Boolean(data.isSolved ?? false),
+            isPublished: Boolean(data.isPublished ?? false),
             answer: String(data.answer),
             rewardType,
         };
@@ -215,6 +226,13 @@ exports.createPuzzleAdmin = functions.https.onCall(async (data, context) => {
                 puzzleDoc.revealImagePath = String(data.revealImagePath);
             }
             // Optional fields may be empty in this mode
+            if (data.walletaddress)
+                puzzleDoc.walletaddress = String(data.walletaddress);
+            if (data.explorerLink)
+                puzzleDoc.explorerLink = String(data.explorerLink);
+        }
+        else if (rewardType === 'text') {
+            puzzleDoc.revealText = String(data.revealText);
             if (data.walletaddress)
                 puzzleDoc.walletaddress = String(data.walletaddress);
             if (data.explorerLink)
@@ -261,6 +279,7 @@ exports.updatePuzzleAdmin = functions.https.onCall(async (data, context) => {
             "rewardType",
             "revealImageUrl",
             "revealImagePath",
+            "revealText",
             "wrongAttempts",
             "solverName",
         ];

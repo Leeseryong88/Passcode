@@ -35,7 +35,15 @@ export const getPublicPuzzles = async (): Promise<PublicPuzzle[]> => {
  * @returns A promise that resolves with the recovery phrase if the answer is correct.
  * @throws An error if the answer is incorrect or any other server error occurs.
  */
-export const checkPuzzleAnswer = async (puzzleId: number, guess: string): Promise<{ type: 'metamask'; recoveryPhrase: string } | { type: 'image'; revealImageUrl: string }> => {
+export const checkPuzzleAnswer = async (
+  puzzleId: number,
+  guess: string
+): Promise<
+  | { type: 'metamask'; recoveryPhrase: string }
+  | { type: 'image'; revealImageUrl: string }
+  | { type: 'text'; revealText: string }
+  | { type: 'already_solved' }
+> => {
    try {
     const result = await checkAnswerCallable({ puzzleId, guess });
     return result.data as any;

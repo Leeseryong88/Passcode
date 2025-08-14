@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { PublicPuzzle } from '../types';
 import RewardModal from './RewardModal';
+import TextRewardModal from './TextRewardModal';
 import InfoModal from './InfoModal';
 import ImageModal from './ImageModal';
 import { ExternalLink, CheckCircle, XCircle, Wallet, LoaderCircle, Star } from 'lucide-react';
@@ -23,6 +24,7 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
   const [recoveryPhrase, setRecoveryPhrase] = useState('');
   const [rewardRevealImageUrl, setRewardRevealImageUrl] = useState('');
   const [isRewardImageModalOpen, setIsRewardImageModalOpen] = useState(false);
+  const [isTextRewardModalOpen, setIsTextRewardModalOpen] = useState(false);
   const [isReentering, setIsReentering] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [infoMessage, setInfoMessage] = useState('');
@@ -61,9 +63,8 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
         setRewardRevealImageUrl(result.revealImageUrl);
         setIsRewardImageModalOpen(true);
       } else if (result.type === 'text') {
-        setRecoveryPhrase('');
         setRevealText(result.revealText || '');
-        setIsModalOpen(true);
+        setIsTextRewardModalOpen(true);
       } else if (result.type === 'already_solved') {
         setInfoMessage(t('already_solved_message'));
         setInfoOpen(true);
@@ -210,6 +211,12 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
         onClose={() => { setIsModalOpen(false); setRevealText(''); onSolve(); }}
         recoveryPhrase={recoveryPhrase}
         revealText={revealText}
+        puzzleId={puzzle.id}
+      />
+      <TextRewardModal
+        isOpen={isTextRewardModalOpen}
+        onClose={() => { setIsTextRewardModalOpen(false); setRevealText(''); onSolve(); }}
+        text={revealText}
         puzzleId={puzzle.id}
       />
       <ImageModal 

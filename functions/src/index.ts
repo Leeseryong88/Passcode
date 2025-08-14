@@ -37,7 +37,6 @@ export const getPuzzles = functions.https.onCall(async (_data, _context) => {
   try {
     const snapshot = await db.collection("puzzles")
       .where("isPublished", "==", true)
-      .orderBy("level", "asc")
       .get();
     const puzzles = snapshot.docs.map((doc) => {
       const puzzleData = doc.data() as any;
@@ -54,6 +53,8 @@ export const getPuzzles = functions.https.onCall(async (_data, _context) => {
       }
       return publicData;
     });
+    // Sort by id ascending without requiring Firestore composite index
+    puzzles.sort((a: any, b: any) => Number(a.id) - Number(b.id));
     return puzzles;
   } catch (error) {
     functions.logger.error("Error fetching puzzles:", error);
@@ -150,7 +151,7 @@ function assertIsAdmin(context: functions.https.CallableContext) {
 export const getAllPuzzlesAdmin = functions.https.onCall(async (_data, context) => {
   assertIsAdmin(context);
   try {
-    const snapshot = await db.collection("puzzles").orderBy("level", "asc").get();
+    const snapshot = await db.collection("puzzles").orderBy("id", "asc").get();
     const puzzles = snapshot.docs.map((doc) => ({
       docId: doc.id,
       ...doc.data(),
@@ -170,7 +171,7 @@ export const getAllPuzzlesAdmin = functions.https.onCall(async (_data, context) 
 export const createPuzzleAdmin = functions.https.onCall(async (data: any, context) => {
   assertIsAdmin(context);
   try {
-    const baseRequired = ["id", "level", "imageUrl", "rewardAmount", "answer", "rewardType"];
+    const baseRequired = ["id", "imageUrl", "rewardAmount", "answer", "rewardType"];
     for (const field of baseRequired) {
       if (typeof data[field] === "undefined" || data[field] === null) {
         throw new functions.https.HttpsError("invalid-argument", `Missing required field: ${field}`);
@@ -204,7 +205,6 @@ export const createPuzzleAdmin = functions.https.onCall(async (data: any, contex
 
     const puzzleDoc: any = {
       id: Number(data.id),
-      level: Number(data.level),
       imageUrl: String(data.imageUrl),
       rewardAmount: String(data.rewardAmount),
       isSolved: Boolean(data.isSolved ?? false),
