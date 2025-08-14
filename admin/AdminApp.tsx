@@ -82,6 +82,12 @@ const AdminApp: React.FC = () => {
     return () => unsub();
   }, []);
 
+  // Auto-generate next id when puzzle list changes
+  useEffect(() => {
+    const nextId = (puzzles.length ? Math.max(...puzzles.map(p => Number((p as any).id) || 0)) : 0) + 1;
+    setNewPuzzle((s: any) => ({ ...s, id: String(nextId) }));
+  }, [puzzles]);
+
   const fetchPuzzles = async () => {
     setLoading(true);
     setError(null);
@@ -276,9 +282,13 @@ const AdminApp: React.FC = () => {
                 <option value="image">Image</option>
                 <option value="text">Text</option>
               </select>
-              <input className="w-full px-3 py-2 bg-gray-700 rounded" placeholder="walletaddress" value={newPuzzle.walletaddress} onChange={(e) => setNewPuzzle((s: any) => ({ ...s, walletaddress: e.target.value }))} />
+              {newPuzzle.rewardType === 'metamask' && (
+                <input className="w-full px-3 py-2 bg-gray-700 rounded" placeholder="walletaddress" value={newPuzzle.walletaddress} onChange={(e) => setNewPuzzle((s: any) => ({ ...s, walletaddress: e.target.value }))} />
+              )}
               <input className="w-full px-3 py-2 bg-gray-700 rounded" placeholder="rewardAmount" value={newPuzzle.rewardAmount} onChange={(e) => setNewPuzzle((s: any) => ({ ...s, rewardAmount: e.target.value }))} />
-              <input className="w-full px-3 py-2 bg-gray-700 rounded" placeholder="explorerLink" value={newPuzzle.explorerLink} onChange={(e) => setNewPuzzle((s: any) => ({ ...s, explorerLink: e.target.value }))} />
+              {newPuzzle.rewardType === 'metamask' && (
+                <input className="w-full px-3 py-2 bg-gray-700 rounded" placeholder="explorerLink" value={newPuzzle.explorerLink} onChange={(e) => setNewPuzzle((s: any) => ({ ...s, explorerLink: e.target.value }))} />
+              )}
               <input className="w-full px-3 py-2 bg-gray-700 rounded" placeholder="answer" value={newPuzzle.answer} onChange={(e) => setNewPuzzle((s: any) => ({ ...s, answer: e.target.value }))} />
               {newPuzzle.rewardType === 'metamask' && (
                 <input className="w-full px-3 py-2 bg-gray-700 rounded" placeholder="recoveryPhrase" value={newPuzzle.recoveryPhrase} onChange={(e) => setNewPuzzle((s: any) => ({ ...s, recoveryPhrase: e.target.value }))} />
@@ -342,15 +352,19 @@ const AdminApp: React.FC = () => {
                 <label className="text-xs opacity-80">Image Path
                   <input className="w-full px-3 py-2 bg-gray-700 rounded" value={(editDraft as any).imagePath || ''} onChange={(e) => handleEditFieldChange('imagePath', e.target.value)} />
                 </label>
-                <label className="text-xs opacity-80">Wallet
-                  <input className="w-full px-3 py-2 bg-gray-700 rounded" value={editDraft.walletaddress} onChange={(e) => handleEditFieldChange('walletaddress', e.target.value)} />
-                </label>
+                {(editDraft as any).rewardType === 'metamask' && (
+                  <label className="text-xs opacity-80">Wallet
+                    <input className="w-full px-3 py-2 bg-gray-700 rounded" value={editDraft.walletaddress} onChange={(e) => handleEditFieldChange('walletaddress', e.target.value)} />
+                  </label>
+                )}
                 <label className="text-xs opacity-80">Reward Amount
                   <input className="w-full px-3 py-2 bg-gray-700 rounded" value={editDraft.rewardAmount} onChange={(e) => handleEditFieldChange('rewardAmount', e.target.value)} />
                 </label>
-                <label className="text-xs opacity-80">Explorer Link
-                  <input className="w-full px-3 py-2 bg-gray-700 rounded" value={editDraft.explorerLink} onChange={(e) => handleEditFieldChange('explorerLink', e.target.value)} />
-                </label>
+                {(editDraft as any).rewardType === 'metamask' && (
+                  <label className="text-xs opacity-80">Explorer Link
+                    <input className="w-full px-3 py-2 bg-gray-700 rounded" value={editDraft.explorerLink} onChange={(e) => handleEditFieldChange('explorerLink', e.target.value)} />
+                  </label>
+                )}
                 <label className="text-xs opacity-80">Answer
                   <input className="w-full px-3 py-2 bg-gray-700 rounded" value={(editDraft as any).answer || ''} onChange={(e) => handleEditFieldChange('answer', e.target.value)} />
                 </label>

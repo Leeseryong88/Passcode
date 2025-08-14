@@ -56,8 +56,8 @@ const FilterControls: React.FC<FilterControlsProps> = ({
                 aria-label={t('filter_by_level')}
             >
                 <option value="all">{t('all_levels')}</option>
-                {levels.map(level => (
-                <option key={level} value={level}>
+                {levels.map((level, idx) => (
+                <option key={`level-${idx}-${level}`} value={level}>
                     {t('level')} {level}
                 </option>
                 ))}
