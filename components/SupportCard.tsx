@@ -15,11 +15,7 @@ const SupportCard: React.FC<SupportCardProps> = ({ walletAddress }) => {
         </p>
       </div>
       
-      <div className="w-full mt-auto pt-4 border-t border-gray-700">
-        <p className="text-lg font-semibold text-gray-200">Free Sponsorship</p>
-        <p className="text-sm text-cyan-300 break-all font-mono mt-2 px-2">{walletAddress}</p>
-        <p className="text-xs text-gray-500 mt-2">Your support helps us create more amazing puzzles.</p>
-      </div>
+      {/* Sponsorship section removed as requested */}
     </div>
   );
 };

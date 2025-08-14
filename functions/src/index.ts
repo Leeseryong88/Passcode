@@ -109,6 +109,12 @@ export const checkAnswer = functions.https.onCall(async (data: any, _context) =>
     if (rewardType === 'metamask') {
       return { type: 'metamask', recoveryPhrase: puzzle.recoveryPhrase };
     }
+    if (rewardType === 'image') {
+      return { type: 'image', revealImageUrl: puzzle.revealImageUrl };
+    }
+    if (rewardType === 'text') {
+      return { type: 'text', revealText: puzzle.revealText || '' };
+    }
     return { type: 'image', revealImageUrl: puzzle.revealImageUrl };
   } catch (error) {
     functions.logger.error("!!! CRITICAL ERROR in checkAnswer !!!:", error);
@@ -182,6 +188,10 @@ export const createPuzzleAdmin = functions.https.onCall(async (data: any, contex
       if (!data.revealImageUrl) {
         throw new functions.https.HttpsError("invalid-argument", "Missing required field for image reward: revealImageUrl");
       }
+    } else if (rewardType === 'text') {
+      if (!data.revealText) {
+        throw new functions.https.HttpsError("invalid-argument", "Missing required field for text reward: revealText");
+      }
     } else {
       throw new functions.https.HttpsError("invalid-argument", "Invalid rewardType. Expected 'metamask' or 'image'.");
     }
@@ -218,6 +228,10 @@ export const createPuzzleAdmin = functions.https.onCall(async (data: any, contex
         puzzleDoc.revealImagePath = String(data.revealImagePath);
       }
       // Optional fields may be empty in this mode
+      if (data.walletaddress) puzzleDoc.walletaddress = String(data.walletaddress);
+      if (data.explorerLink) puzzleDoc.explorerLink = String(data.explorerLink);
+    } else if (rewardType === 'text') {
+      puzzleDoc.revealText = String(data.revealText);
       if (data.walletaddress) puzzleDoc.walletaddress = String(data.walletaddress);
       if (data.explorerLink) puzzleDoc.explorerLink = String(data.explorerLink);
     }
@@ -264,6 +278,7 @@ export const updatePuzzleAdmin = functions.https.onCall(async (data: any, contex
       "rewardType",
       "revealImageUrl",
       "revealImagePath",
+      "revealText",
       "wrongAttempts",
       "solverName",
     ];

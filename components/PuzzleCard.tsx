@@ -3,7 +3,7 @@ import type { PublicPuzzle } from '../types';
 import RewardModal from './RewardModal';
 import InfoModal from './InfoModal';
 import ImageModal from './ImageModal';
-import { ExternalLink, CheckCircle, XCircle, Wallet, Puzzle as PuzzleIcon, LoaderCircle, Star } from 'lucide-react';
+import { ExternalLink, CheckCircle, XCircle, Wallet, LoaderCircle, Star } from 'lucide-react';
 import { checkPuzzleAnswer, getSolvedAnswer } from '../api/puzzles';
 import { useTranslation } from 'react-i18next';
 
@@ -28,6 +28,8 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
   const [infoMessage, setInfoMessage] = useState('');
   const [showAnswer, setShowAnswer] = useState(false);
   const [answerText, setAnswerText] = useState('');
+  const [revealText, setRevealText] = useState('');
+  const [showWalletAddress, setShowWalletAddress] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -58,6 +60,10 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
       } else if (result.type === 'image') {
         setRewardRevealImageUrl(result.revealImageUrl);
         setIsRewardImageModalOpen(true);
+      } else if (result.type === 'text') {
+        setRecoveryPhrase('');
+        setRevealText(result.revealText || '');
+        setIsModalOpen(true);
       } else if (result.type === 'already_solved') {
         setInfoMessage(t('already_solved_message'));
         setInfoOpen(true);
@@ -104,15 +110,12 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
         )}
         <img 
           src={puzzle.imageUrl} 
-          alt={`${t('level')} ${puzzle.level}`} 
+          alt={`puzzle image`} 
           className="w-full h-36 sm:h-40 object-cover cursor-pointer"
           onClick={() => setIsImageModalOpen(true)}
         />
         <div className="p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base sm:text-lg font-semibold text-cyan-300 flex items-center gap-2">
-              <PuzzleIcon className="w-4 h-4 sm:w-5 sm:h-5" /> {t('level')} {puzzle.level}
-            </h2>
+          <div className="flex items-center justify-end mb-3">
             <span className="text-[10px] sm:text-xs font-semibold bg-yellow-600/20 text-yellow-300 px-2 py-0.5 rounded">{puzzle.rewardAmount}</span>
           </div>
           <div className="flex justify-end mb-2">
@@ -122,7 +125,17 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
             <div className="bg-gray-900/40 p-2 rounded-lg mb-3 space-y-1 text-xs">
               <div className="flex items-center gap-2 text-gray-300">
                 <Wallet className="w-3.5 h-3.5 text-cyan-400" />
-                <span className="font-spacemono break-all">{puzzle.walletaddress}</span>
+                {showWalletAddress ? (
+                  <span className="font-spacemono break-all">{puzzle.walletaddress}</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowWalletAddress(true)}
+                    className="text-cyan-300 hover:text-cyan-200 underline decoration-dotted"
+                  >
+                    {t('view_wallet_address') || '지갑 주소 보기'}
+                  </button>
+                )}
               </div>
               {puzzle.explorerLink && (
                 <a href={puzzle.explorerLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-cyan-400 hover:text-cyan-300 transition-colors">
@@ -194,8 +207,9 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
       </div>
       <RewardModal
         isOpen={isModalOpen}
-        onClose={() => { setIsModalOpen(false); onSolve(); }}
+        onClose={() => { setIsModalOpen(false); setRevealText(''); onSolve(); }}
         recoveryPhrase={recoveryPhrase}
+        revealText={revealText}
         puzzleId={puzzle.id}
       />
       <ImageModal 

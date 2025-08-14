@@ -63,6 +63,10 @@ const App: React.FC = () => {
     return [...new Set(allLevels)].sort((a, b) => a - b);
   }, [puzzles]);
 
+  const hasActiveUnsolved = useMemo(() => {
+    return puzzles.some((p: any) => Boolean(p?.isPublished) && !Boolean(p?.isSolved));
+  }, [puzzles]);
+
   const filteredPuzzles = useMemo(() => {
     return puzzles.filter(puzzle => {
       const solveStatusFilter = 
@@ -119,19 +123,19 @@ const App: React.FC = () => {
 
           {!isLoading && !error && (
             <div className="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
-            {filteredPuzzles.map((puzzle) => (
-              <PuzzleCard 
-                key={puzzle.id} 
-                puzzle={puzzle} 
-                isSolved={puzzle.isSolved || false}
-                onSolve={handleSolve}
-              />
-            ))}
-            <SupportCard 
-              walletAddress={supportWalletAddress}
-            />
-          </div>
-        )}
+              {filteredPuzzles.map((puzzle) => (
+                <PuzzleCard 
+                  key={puzzle.id} 
+                  puzzle={puzzle} 
+                  isSolved={puzzle.isSolved || false}
+                  onSolve={handleSolve}
+                />
+              ))}
+              {!hasActiveUnsolved && (
+                <SupportCard walletAddress={supportWalletAddress} />
+              )}
+            </div>
+          )}
         
       </main>
       <footer className="text-center p-6 text-gray-500 text-sm">

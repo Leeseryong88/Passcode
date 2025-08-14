@@ -9,12 +9,13 @@ interface RewardModalProps {
   onClose: () => void;
   recoveryPhrase: string;
   puzzleId?: number;
+  revealText?: string;
 }
 
-const RewardModal: React.FC<RewardModalProps> = ({ isOpen, onClose, recoveryPhrase, puzzleId }) => {
+const RewardModal: React.FC<RewardModalProps> = ({ isOpen, onClose, recoveryPhrase, puzzleId, revealText }) => {
   const { t } = useTranslation();
   const [copied, copyToClipboard] = useCopyToClipboard();
-  const words = recoveryPhrase.split(' ');
+  const words = recoveryPhrase ? recoveryPhrase.split(' ') : [];
   const [solverName, setSolverName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -61,16 +62,22 @@ const RewardModal: React.FC<RewardModalProps> = ({ isOpen, onClose, recoveryPhra
             <p className="text-gray-300 mb-6">{t('reward_modal_description')}</p>
         </div>
 
-        <div className="bg-gray-900/70 p-4 rounded-lg mb-6">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3 font-spacemono text-gray-200">
-                {words.map((word, index) => (
-                    <div key={index} className="flex items-center">
-                        <span className="text-gray-500 w-6 text-right mr-2">{index + 1}.</span>
-                        <span>{word}</span>
-                    </div>
-                ))}
-            </div>
-        </div>
+        {revealText ? (
+          <div className="bg-gray-900/70 p-4 rounded-lg mb-6 text-gray-200 whitespace-pre-wrap break-words">
+            {revealText}
+          </div>
+        ) : (
+          <div className="bg-gray-900/70 p-4 rounded-lg mb-6">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3 font-spacemono text-gray-200">
+                  {words.map((word, index) => (
+                      <div key={index} className="flex items-center">
+                          <span className="text-gray-500 w-6 text-right mr-2">{index + 1}.</span>
+                          <span>{word}</span>
+                      </div>
+                  ))}
+              </div>
+          </div>
+        )}
 
         <div className="flex items-center bg-blue-900/40 text-blue-300 p-3 rounded-lg text-sm mb-3">
           <p>{t('reward_modal_guidance')}</p>

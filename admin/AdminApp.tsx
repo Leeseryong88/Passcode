@@ -18,7 +18,6 @@ const AdminApp: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [newPuzzle, setNewPuzzle] = useState<any>({
     id: '',
-    level: '',
     imageUrl: '',
     walletaddress: '',
     rewardAmount: '',
@@ -165,11 +164,10 @@ const AdminApp: React.FC = () => {
       const payload = {
         ...newPuzzle,
         id: Number(newPuzzle.id),
-        level: Number(newPuzzle.level),
         isPublished: Boolean(newPuzzle.isPublished),
       };
       await createPuzzleAdmin(payload);
-      setNewPuzzle({ id: '', level: '', imageUrl: '', walletaddress: '', rewardAmount: '', explorerLink: '', answer: '', recoveryPhrase: '', isSolved: false, isPublished: false, rewardType: 'metamask', revealImageUrl: '' });
+      setNewPuzzle({ id: '', imageUrl: '', walletaddress: '', rewardAmount: '', explorerLink: '', answer: '', recoveryPhrase: '', isSolved: false, isPublished: false, rewardType: 'metamask', revealImageUrl: '' });
       await fetchPuzzles();
     } catch (e: any) {
       setError(e.message || 'Create failed');
@@ -239,10 +237,9 @@ const AdminApp: React.FC = () => {
                     {p.isSolved && (
                       <span className="absolute top-2 left-2 text-xs font-semibold bg-green-700/70 text-green-100 px-2 py-0.5 rounded">Solved</span>
                     )}
-                    <img src={p.imageUrl} alt={`L${p.level}`} className="w-full h-36 object-cover" />
+                <img src={p.imageUrl} alt={`puzzle`} className="w-full h-36 object-cover" />
                     <div className="p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-base font-semibold text-cyan-300">Level {p.level}</h3>
+                      <div className="flex items-center justify-end">
                         <span className="text-xs font-semibold bg-yellow-600/20 text-yellow-300 px-2 py-0.5 rounded">{p.rewardAmount}</span>
                       </div>
                       <div className="flex flex-wrap gap-2 text-xs">
@@ -260,7 +257,6 @@ const AdminApp: React.FC = () => {
             <h2 className="font-semibold mb-3">{t('new_puzzle')}</h2>
             <form onSubmit={handleCreate} className="space-y-2">
               <input className="w-full px-3 py-2 bg-gray-700 rounded" placeholder="id" value={newPuzzle.id} onChange={(e) => setNewPuzzle((s: any) => ({ ...s, id: e.target.value }))} />
-              <input className="w-full px-3 py-2 bg-gray-700 rounded" placeholder="level" value={newPuzzle.level} onChange={(e) => setNewPuzzle((s: any) => ({ ...s, level: e.target.value }))} />
               <div className="flex items-center gap-2">
                 <input type="checkbox" id="isPublished" checked={newPuzzle.isPublished} onChange={(e) => setNewPuzzle((s: any) => ({...s, isPublished: e.target.checked}))} />
                 <label htmlFor="isPublished">Publish on create</label>
@@ -279,6 +275,7 @@ const AdminApp: React.FC = () => {
               <select className="w-full px-3 py-2 bg-gray-700 rounded" value={newPuzzle.rewardType} onChange={(e) => setNewPuzzle((s: any) => ({ ...s, rewardType: e.target.value }))}>
                 <option value="metamask">Metamask</option>
                 <option value="image">Image</option>
+                <option value="text">Text</option>
               </select>
               <input className="w-full px-3 py-2 bg-gray-700 rounded" placeholder="walletaddress" value={newPuzzle.walletaddress} onChange={(e) => setNewPuzzle((s: any) => ({ ...s, walletaddress: e.target.value }))} />
               <input className="w-full px-3 py-2 bg-gray-700 rounded" placeholder="rewardAmount" value={newPuzzle.rewardAmount} onChange={(e) => setNewPuzzle((s: any) => ({ ...s, rewardAmount: e.target.value }))} />
@@ -302,6 +299,9 @@ const AdminApp: React.FC = () => {
                   }} />
                 </>
               )}
+              {newPuzzle.rewardType === 'text' && (
+                <textarea className="w-full px-3 py-2 bg-gray-700 rounded" placeholder="revealText" value={(newPuzzle as any).revealText || ''} onChange={(e) => setNewPuzzle((s: any) => ({ ...s, revealText: e.target.value }))} />
+              )}
               <button className="w-full bg-cyan-600 hover:bg-cyan-700 py-2 rounded font-semibold">{t('create')}</button>
             </form>
           </div>
@@ -317,9 +317,6 @@ const AdminApp: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <label className="text-xs opacity-80">ID
                   <input className="w-full px-3 py-2 bg-gray-800 rounded opacity-70 cursor-not-allowed" value={String(editDraft.id)} disabled />
-                </label>
-                <label className="text-xs opacity-80">Level
-                  <input className="w-full px-3 py-2 bg-gray-700 rounded" value={editDraft.level as any} onChange={(e) => handleEditFieldChange('level', e.target.value)} />
                 </label>
                 <label className="text-xs opacity-80">Published
                   <select className="w-full px-3 py-2 bg-gray-700 rounded" value={String(editDraft.isPublished || false)} onChange={(e) => handleEditFieldChange('isPublished', e.target.value === 'true')}>
@@ -337,6 +334,7 @@ const AdminApp: React.FC = () => {
                   <select className="w-full px-3 py-2 bg-gray-700 rounded" value={(editDraft as any).rewardType || 'metamask'} onChange={(e) => handleEditFieldChange('rewardType', e.target.value)}>
                     <option value="metamask">metamask</option>
                     <option value="image">image</option>
+                    <option value="text">text</option>
                   </select>
                 </label>
                 <label className="text-xs opacity-80">Image URL
@@ -365,6 +363,11 @@ const AdminApp: React.FC = () => {
                 {(editDraft as any).rewardType === 'image' && (
                   <label className="text-xs opacity-80">Reveal Image URL
                     <input className="w-full px-3 py-2 bg-gray-700 rounded" value={(editDraft as any).revealImageUrl || ''} onChange={(e) => handleEditFieldChange('revealImageUrl', e.target.value)} />
+                  </label>
+                )}
+                {(editDraft as any).rewardType === 'text' && (
+                  <label className="text-xs opacity-80">Reveal Text
+                    <textarea className="w-full px-3 py-2 bg-gray-700 rounded" value={(editDraft as any).revealText || ''} onChange={(e) => handleEditFieldChange('revealText', e.target.value)} />
                   </label>
                 )}
                 {(editDraft as any).rewardType === 'image' && (
