@@ -91,7 +91,7 @@ const TextRewardModal: React.FC<TextRewardModalProps> = ({ isOpen, onClose, text
             disabled={isSaving}
             className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:bg-gray-600"
           >
-            {isSaving ? (t('save') || 'Save') : t('close')}
+            {t('save')}
           </button>
         </div>
       </div>

@@ -82,7 +82,7 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, imageUrl, noti
             {validationError && <div className="mt-2 text-red-400 text-sm">{validationError}</div>}
             <div className="mt-3 flex justify-end">
               <button onClick={handleCloseWithSave} disabled={isSaving} className="bg-gray-600 hover:bg-gray-700 disabled:bg-gray-600 text-white font-semibold px-4 py-2 rounded">
-                {isSaving ? (t('save') || 'Save') : (t('close') || 'Close')}
+                {t('save')}
               </button>
             </div>
           </div>
