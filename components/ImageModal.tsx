@@ -49,11 +49,11 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, imageUrl, noti
 
   return (
     <div 
-      className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50"
+      className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4"
       onClick={onClose}
     >
       <div 
-        className="relative bg-gray-900 p-4 rounded-lg shadow-xl max-w-4xl max-h-[90vh] w-full"
+        className="relative bg-gray-900 p-4 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -63,7 +63,7 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, imageUrl, noti
         >
           <X className="w-6 h-6" />
         </button>
-        <img src={imageUrl} alt="Puzzle full view" className="max-w-full max-h-[60vh] object-contain mx-auto" />
+        <img src={imageUrl} alt="Puzzle full view" className="max-w-full max-h-[50vh] sm:max-h-[60vh] object-contain mx-auto" />
         {notice && (
           <div className="mt-4 bg-yellow-900/40 text-yellow-200 text-sm p-3 rounded-md">
             {notice}
