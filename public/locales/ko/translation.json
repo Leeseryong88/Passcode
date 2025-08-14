@@ -52,7 +52,7 @@
   "all_levels": "모든 레벨",
   "one_time_reveal_warning": "이 보상 정보는 최초 1회만 공개됩니다. 반드시 안전한 곳에 저장하세요.",
   "already_solved_message": "이문제는 이미 다른사람에 의해서 정답이 제출 됐습니다.",
-  "wrong_attempts_count": "총 도전 횟수: {{count}}회",
+  "wrong_attempts_count": "실패한 도전: {{count}}회",
   "enter_solver_name": "정답자 이름 입력",
   "enter_solver_name_placeholder": "표시할 이름 또는 닉네임을 입력하세요",
   "name_moderation_notice": "부적절한 닉네임은 관리자에 의해 삭제될 수 있습니다.",
