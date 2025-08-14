@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 import FilterControls from './components/FilterControls';
 import { Analytics } from '@vercel/analytics/react';
 
-type FilterType = 'all' | 'solved' | 'unsolved' | 'level';
+type FilterType = 'all' | 'solved' | 'unsolved';
 
 const App: React.FC = () => {
   const { t } = useTranslation();
@@ -17,7 +17,7 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<FilterType>('unsolved');
-  const [selectedLevel, setSelectedLevel] = useState<number | 'all'>('all');
+  // Level filter removed
 
   const fetchPuzzles = useCallback(async () => {
     try {
@@ -58,10 +58,7 @@ const App: React.FC = () => {
     fetchPuzzles();
   };
 
-  const levels = useMemo(() => {
-    const allLevels = puzzles.map(p => p.level);
-    return [...new Set(allLevels)].sort((a, b) => a - b);
-  }, [puzzles]);
+  // Level filter removed
 
   const hasActiveUnsolved = useMemo(() => {
     return puzzles.some((p: any) => Boolean(p?.isPublished) && !Boolean(p?.isSolved));
@@ -69,30 +66,19 @@ const App: React.FC = () => {
 
   const filteredPuzzles = useMemo(() => {
     return puzzles.filter(puzzle => {
-      const solveStatusFilter = 
+      const solveStatusFilter =
         activeFilter === 'all' ||
         (activeFilter === 'solved' && puzzle.isSolved) ||
         (activeFilter === 'unsolved' && !puzzle.isSolved);
-
-      const levelFilter = selectedLevel === 'all' || puzzle.level === selectedLevel;
-
-      return solveStatusFilter && levelFilter;
+      return solveStatusFilter;
     });
-  }, [puzzles, activeFilter, selectedLevel]);
+  }, [puzzles, activeFilter]);
 
   const handleFilterChange = (filter: FilterType) => {
     setActiveFilter(filter);
-    if (filter !== 'all') {
-      setSelectedLevel('all');
-    }
   };
 
-  const handleLevelChange = (level: number | 'all') => {
-    setSelectedLevel(level);
-    if (level !== 'all') {
-      setActiveFilter('all');
-    }
-  };
+  // Level change handler removed
 
   const supportWalletAddress = "0x47Cb533DD27446c912C4cc41Bda9407e8F7BAF95";
 
@@ -104,9 +90,6 @@ const App: React.FC = () => {
         <FilterControls 
           activeFilter={activeFilter}
           onFilterChange={handleFilterChange}
-          levels={levels}
-          selectedLevel={selectedLevel}
-          onLevelChange={handleLevelChange}
         />
         
         {isLoading && (

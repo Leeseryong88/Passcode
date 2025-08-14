@@ -1,23 +1,17 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { List, Check, X, Star } from 'lucide-react';
+import { List, Check, X } from 'lucide-react';
 
-type FilterType = 'all' | 'solved' | 'unsolved' | 'level';
+type FilterType = 'all' | 'solved' | 'unsolved';
 
 interface FilterControlsProps {
   activeFilter: FilterType;
   onFilterChange: (filter: FilterType) => void;
-  levels: number[];
-  selectedLevel: number | 'all';
-  onLevelChange: (level: number | 'all') => void;
 }
 
 const FilterControls: React.FC<FilterControlsProps> = ({ 
   activeFilter, 
-  onFilterChange, 
-  levels,
-  selectedLevel,
-  onLevelChange
+  onFilterChange
 }) => {
   const { t } = useTranslation();
 
@@ -46,24 +40,7 @@ const FilterControls: React.FC<FilterControlsProps> = ({
         ))}
       </div>
 
-      <div className="w-full md:w-auto">
-        <div className="flex items-center gap-2 text-gray-300">
-            <Star size={18} className="text-yellow-400"/>
-            <select
-                value={selectedLevel}
-                onChange={(e) => onLevelChange(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-                className="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm font-medium text-white focus:ring-2 focus:ring-cyan-500 focus:outline-none appearance-none w-full md:w-auto"
-                aria-label={t('filter_by_level')}
-            >
-                <option value="all">{t('all_levels')}</option>
-                {levels.map((level, idx) => (
-                <option key={`level-${idx}-${level}`} value={level}>
-                    {t('level')} {level}
-                </option>
-                ))}
-            </select>
-        </div>
-      </div>
+      {/* Level filter removed per requirements */}
     </div>
   );
 };
