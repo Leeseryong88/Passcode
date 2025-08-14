@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="google-adsense-account" content="ca-pub-1617599022667185">
     <title>Crypto Puzzle Quest</title>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -16,6 +16,9 @@
       .font-spacemono {
         font-family: 'Space Mono', monospace;
       }
+      /* Hide horizontal scrollbar for filter row on mobile */
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
     
     <script type="importmap">
