@@ -203,6 +203,7 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
         onClose={() => setIsImageModalOpen(false)}
         imageUrl={puzzle.imageUrl}
         puzzleId={puzzle.id}
+        enableSolverName={false}
       />
       <ImageModal
         isOpen={isRewardImageModalOpen}
@@ -210,6 +211,7 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
         imageUrl={rewardRevealImageUrl}
         notice={t('one_time_reveal_warning')}
         puzzleId={puzzle.id}
+        enableSolverName={true}
       />
       <InfoModal isOpen={infoOpen} onClose={() => setInfoOpen(false)} message={infoMessage} />
     </>

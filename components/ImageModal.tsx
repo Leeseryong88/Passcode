@@ -9,9 +9,10 @@ interface ImageModalProps {
   imageUrl: string;
   notice?: string;
   puzzleId?: number;
+  enableSolverName?: boolean;
 }
 
-const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, imageUrl, notice, puzzleId }) => {
+const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, imageUrl, notice, puzzleId, enableSolverName }) => {
   const { t } = useTranslation();
   const [solverName, setSolverName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -20,6 +21,11 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, imageUrl, noti
   if (!isOpen) return null;
 
   const handleCloseWithSave = async () => {
+    // If solver name flow is disabled, just close
+    if (!enableSolverName) {
+      onClose();
+      return;
+    }
     if (!puzzleId) {
       onClose();
       return;
@@ -63,23 +69,24 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, imageUrl, noti
             {notice}
           </div>
         )}
-
-        <div className="mt-4">
-          <label className="block text-sm mb-1">{t('enter_solver_name') || 'Your name or nickname (optional)'}</label>
-          <input
-            value={solverName}
-            onChange={(e) => setSolverName(e.target.value)}
-            className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-colors text-sm"
-            placeholder={t('enter_solver_name_placeholder') || 'Enter name to display on the board'}
-          />
-          <p className="mt-1 text-xs text-gray-400">{t('name_moderation_notice') || 'Inappropriate names may be removed by admins.'}</p>
-          {validationError && <div className="mt-2 text-red-400 text-sm">{validationError}</div>}
-          <div className="mt-3 flex justify-end">
-            <button onClick={handleCloseWithSave} disabled={isSaving} className="bg-gray-600 hover:bg-gray-700 disabled:bg-gray-600 text-white font-semibold px-4 py-2 rounded">
-              {isSaving ? (t('save') || 'Save') : (t('close') || 'Close')}
-            </button>
+        {enableSolverName && (
+          <div className="mt-4">
+            <label className="block text-sm mb-1">{t('enter_solver_name') || 'Your name or nickname (optional)'}</label>
+            <input
+              value={solverName}
+              onChange={(e) => setSolverName(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-colors text-sm"
+              placeholder={t('enter_solver_name_placeholder') || 'Enter name to display on the board'}
+            />
+            <p className="mt-1 text-xs text-gray-400">{t('name_moderation_notice') || 'Inappropriate names may be removed by admins.'}</p>
+            {validationError && <div className="mt-2 text-red-400 text-sm">{validationError}</div>}
+            <div className="mt-3 flex justify-end">
+              <button onClick={handleCloseWithSave} disabled={isSaving} className="bg-gray-600 hover:bg-gray-700 disabled:bg-gray-600 text-white font-semibold px-4 py-2 rounded">
+                {isSaving ? (t('save') || 'Save') : (t('close') || 'Close')}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

@@ -261,6 +261,8 @@ exports.updatePuzzleAdmin = functions.https.onCall(async (data, context) => {
             "rewardType",
             "revealImageUrl",
             "revealImagePath",
+            "wrongAttempts",
+            "solverName",
         ];
         const updatePayload = {};
         for (const field of updatableFields) {
