@@ -40,7 +40,11 @@ export const checkPuzzleAnswer = async (puzzleId: number, guess: string): Promis
     const result = await checkAnswerCallable({ puzzleId, guess });
     return result.data as any;
   } catch (error: any) {
-    console.error("Error calling checkAnswer function:", error);
+    const code = error?.code as string | undefined;
+    const isExpectedWrongAnswer = code === 'functions/failed-precondition' || code === 'functions/unauthenticated';
+    if (!isExpectedWrongAnswer) {
+      console.error("Error calling checkAnswer function:", error);
+    }
     // The Firebase Functions SDK provides a detailed error object.
     // The `message` property is suitable for user display.
     throw new Error(error.message || 'An error occurred while checking the answer.');

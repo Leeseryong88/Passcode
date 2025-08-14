@@ -86,7 +86,8 @@ export const checkAnswer = functions.https.onCall(async (data: any, _context) =>
       } catch (incErr) {
         functions.logger.warn('Failed to increment wrongAttempts', incErr as any);
       }
-      throw new functions.https.HttpsError("unauthenticated", "Incorrect answer. Please try again.");
+      // Use failed-precondition to avoid misleading 401 Unauthorized in network logs
+      throw new functions.https.HttpsError("failed-precondition", "Incorrect answer. Please try again.");
     }
 
     // Atomically mark solved only once

@@ -84,7 +84,14 @@ exports.checkAnswer = functions.https.onCall(async (data, _context) => {
         // Validate answer first
         const isCorrect = guess.trim().toLowerCase() === String(puzzle.answer).toLowerCase();
         if (!isCorrect) {
-            throw new functions.https.HttpsError("unauthenticated", "Incorrect answer. Please try again.");
+            try {
+                await doc.ref.update({ wrongAttempts: admin.firestore.FieldValue.increment(1) });
+            }
+            catch (incErr) {
+                functions.logger.warn('Failed to increment wrongAttempts', incErr);
+            }
+            // Use failed-precondition to avoid misleading 401 in client network panel
+            throw new functions.https.HttpsError("failed-precondition", "Incorrect answer. Please try again.");
         }
         // Atomically mark solved only once
         const firstSolver = await db.runTransaction(async (tx) => {
