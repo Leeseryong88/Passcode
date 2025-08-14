@@ -60,6 +60,18 @@ export const getSolvedAnswer = async (puzzleId: number): Promise<string | null> 
   }
 };
 
+export const submitSolverName = async (puzzleId: number, name: string): Promise<{ success: boolean }> => {
+  try {
+    const { getFunctions, httpsCallable } = await import('firebase/functions');
+    const functions = getFunctions(undefined as any, 'us-central1');
+    const callable = httpsCallable(functions as any, 'setSolverName');
+    const res: any = await callable({ puzzleId, name });
+    return (res.data as any) || { success: true };
+  } catch (error: any) {
+    throw new Error(error?.message || 'Failed to submit solver name');
+  }
+};
+
 // Admin APIs
 export const getAllPuzzlesAdmin = async (): Promise<any[]> => {
   const result = await getAllPuzzlesAdminCallable();

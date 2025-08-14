@@ -31,6 +31,10 @@ const AdminApp: React.FC = () => {
     revealImageUrl: '',
   });
 
+  // Edit modal state
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editDraft, setEditDraft] = useState<AdminPuzzle | null>(null);
+
   const readFileAsBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -92,6 +96,51 @@ const AdminApp: React.FC = () => {
     }
   };
 
+  const openEdit = (p: AdminPuzzle) => {
+    setEditDraft({ ...p } as AdminPuzzle);
+    setIsEditOpen(true);
+  };
+
+  const closeEdit = () => {
+    setIsEditOpen(false);
+    setEditDraft(null);
+  };
+
+  const handleEditFieldChange = (field: string, value: any) => {
+    setEditDraft((prev) => (prev ? { ...(prev as any), [field]: value } as any : prev));
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editDraft) return;
+    setError(null);
+    try {
+      const payload: any = { ...editDraft };
+      // Ensure proper types
+      payload.id = Number(payload.id);
+      payload.level = Number(payload.level);
+      if (typeof (payload as any).wrongAttempts !== 'undefined') {
+        payload.wrongAttempts = Number((payload as any).wrongAttempts);
+      }
+      await updatePuzzleAdmin(payload);
+      closeEdit();
+      await fetchPuzzles();
+    } catch (e: any) {
+      setError(e.message || 'Update failed');
+    }
+  };
+
+  const handleDeleteEdit = async () => {
+    if (!editDraft) return;
+    setError(null);
+    try {
+      await deletePuzzleAdmin(editDraft.id);
+      closeEdit();
+      await fetchPuzzles();
+    } catch (e: any) {
+      setError(e.message || 'Delete failed');
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -127,33 +176,7 @@ const AdminApp: React.FC = () => {
     }
   };
 
-  const handleUpdate = async (puzzleId: number) => {
-    setError(null);
-    try {
-      const puzzleToUpdate = puzzles.find(p => p.id === puzzleId);
-      if (!puzzleToUpdate) {
-        throw new Error("Puzzle not found in local state");
-      }
-      await updatePuzzleAdmin(puzzleToUpdate);
-      await fetchPuzzles();
-    } catch (e: any) {
-      setError(e.message || 'Update failed');
-    }
-  };
-
-  const handleDelete = async (id: number) => {
-    setError(null);
-    try {
-      await deletePuzzleAdmin(id);
-      await fetchPuzzles();
-    } catch (e: any) {
-      setError(e.message || 'Delete failed');
-    }
-  };
-
-  const handleFieldChange = (id: number, field: string, value: any) => {
-    setPuzzles(prev => prev.map(p => (p.id === id ? { ...p, [field]: value } : p)));
-  };
+  // legacy handlers removed in favor of modal-based edit
 
   const handleGrantAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -201,8 +224,8 @@ const AdminApp: React.FC = () => {
         </div>
         {error && <div className="mb-3 text-sm text-red-400">{error}</div>}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-gray-800 border border-gray-700 rounded-xl p-4">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div className="xl:col-span-2">
             <div className="flex items-center justify-between mb-3">
               <h2 className="font-semibold">{t('puzzle_list')}</h2>
               <button onClick={fetchPuzzles} className="text-sm bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded">Reload</button>
@@ -210,62 +233,23 @@ const AdminApp: React.FC = () => {
             {loading ? (
               <div>Loading...</div>
             ) : (
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 {puzzles.map((p) => (
-                  <div key={p.id} className="p-3 bg-gray-900 rounded border border-gray-700">
-                    <div className="flex flex-wrap gap-2 items-center justify-between">
-                      <div className="font-semibold">#{p.id} L{p.level}</div>
-                      <div className="text-sm">{p.isSolved ? t('solved') : t('unsolved')}</div>
-                      <div className="text-sm font-semibold">{p.isPublished ? 'Published' : 'Unpublished'}</div>
-                      <div className="flex gap-2">
-                        <button className="text-sm bg-blue-700 hover:bg-blue-600 px-3 py-1 rounded" onClick={() => handleFieldChange(p.id, 'isSolved', !p.isSolved)}>
-                          Toggle Solved
-                        </button>
-                        <button className="text-sm bg-yellow-700 hover:bg-yellow-600 px-3 py-1 rounded" onClick={() => handleFieldChange(p.id, 'isPublished', !p.isPublished)}>
-                          Toggle Published
-                        </button>
-                        <button className="text-sm bg-red-700 hover:bg-red-600 px-3 py-1 rounded" onClick={() => handleDelete(p.id)}>
-                          {t('delete')}
-                        </button>
+                  <div key={p.id} className={`relative bg-gray-800 border ${p.isSolved ? 'border-green-500/50' : 'border-gray-700'} rounded-xl shadow-lg overflow-hidden transition-colors duration-200 hover:shadow-cyan-500/10 cursor-pointer`} onClick={() => openEdit(p)}>
+                    {p.isSolved && (
+                      <span className="absolute top-2 left-2 text-xs font-semibold bg-green-700/70 text-green-100 px-2 py-0.5 rounded">Solved</span>
+                    )}
+                    <img src={p.imageUrl} alt={`L${p.level}`} className="w-full h-36 object-cover" />
+                    <div className="p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-base font-semibold text-cyan-300">Level {p.level}</h3>
+                        <span className="text-xs font-semibold bg-yellow-600/20 text-yellow-300 px-2 py-0.5 rounded">{p.rewardAmount}</span>
                       </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
-                      <label className="text-xs opacity-70">Reward Type
-                        <select className="w-full px-2 py-1 bg-gray-800 rounded" value={(p as any).rewardType || 'metamask'} onChange={(e) => handleFieldChange(p.id, 'rewardType', e.target.value)}>
-                          <option value="metamask">Metamask</option>
-                          <option value="image">Image</option>
-                        </select>
-                      </label>
-                      <label className="text-xs opacity-70">Image URL
-                        <input className="w-full px-2 py-1 bg-gray-800 rounded" value={p.imageUrl} onChange={(e) => handleFieldChange(p.id, 'imageUrl', e.target.value)} />
-                      </label>
-                      <label className="text-xs opacity-70">Wallet
-                        <input className="w-full px-2 py-1 bg-gray-800 rounded" value={p.walletaddress} onChange={(e) => handleFieldChange(p.id, 'walletaddress', e.target.value)} />
-                      </label>
-                      <label className="text-xs opacity-70">Reward
-                        <input className="w-full px-2 py-1 bg-gray-800 rounded" value={p.rewardAmount} onChange={(e) => handleFieldChange(p.id, 'rewardAmount', e.target.value)} />
-                      </label>
-                      <label className="text-xs opacity-70">Explorer
-                        <input className="w-full px-2 py-1 bg-gray-800 rounded" value={p.explorerLink} onChange={(e) => handleFieldChange(p.id, 'explorerLink', e.target.value)} />
-                      </label>
-                      <label className="text-xs opacity-70">Answer
-                        <input className="w-full px-2 py-1 bg-gray-800 rounded" value={(p as any).answer || ''} onChange={(e) => handleFieldChange(p.id, 'answer', e.target.value)} />
-                      </label>
-                      {(p as any).rewardType === 'metamask' && (
-                        <label className="text-xs opacity-70">Recovery Phrase
-                          <input className="w-full px-2 py-1 bg-gray-800 rounded" value={(p as any).recoveryPhrase || ''} onChange={(e) => handleFieldChange(p.id, 'recoveryPhrase', e.target.value)} />
-                        </label>
-                      )}
-                      {(p as any).rewardType === 'image' && (
-                        <label className="text-xs opacity-70">Reveal Image URL
-                          <input className="w-full px-2 py-1 bg-gray-800 rounded" value={(p as any).revealImageUrl || ''} onChange={(e) => handleFieldChange(p.id, 'revealImageUrl', e.target.value)} />
-                        </label>
-                      )}
-                    </div>
-                    <div className="mt-2 flex justify-end">
-                      <button className="text-sm bg-green-700 hover:bg-green-600 px-3 py-1 rounded" onClick={() => handleUpdate(p.id)}>
-                        {t('save')}
-                      </button>
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        <span className={`px-2 py-0.5 rounded ${p.isPublished ? 'bg-blue-600/20 text-blue-300' : 'bg-gray-600/20 text-gray-300'}`}>{p.isPublished ? 'Published' : 'Unpublished'}</span>
+                        <span className="px-2 py-0.5 rounded bg-purple-600/20 text-purple-300">{(p as any).rewardType || 'metamask'}</span>
+                        <span className="px-2 py-0.5 rounded bg-red-600/20 text-red-300">{t('wrong_attempts_count', { count: (p as any).wrongAttempts || 0 })}</span>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -322,6 +306,72 @@ const AdminApp: React.FC = () => {
             </form>
           </div>
         </div>
+        {/* Edit Modal */}
+        {isEditOpen && editDraft && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={closeEdit}>
+            <div className="w-full max-w-2xl bg-gray-800 border border-gray-700 rounded-xl p-4" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold">Edit Puzzle #{editDraft.id}</h3>
+                <button className="text-sm bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded" onClick={closeEdit}>Close</button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <label className="text-xs opacity-80">Level
+                  <input className="w-full px-3 py-2 bg-gray-700 rounded" value={editDraft.level as any} onChange={(e) => handleEditFieldChange('level', e.target.value)} />
+                </label>
+                <label className="text-xs opacity-80">Published
+                  <select className="w-full px-3 py-2 bg-gray-700 rounded" value={String(editDraft.isPublished || false)} onChange={(e) => handleEditFieldChange('isPublished', e.target.value === 'true')}>
+                    <option value="true">true</option>
+                    <option value="false">false</option>
+                  </select>
+                </label>
+                <label className="text-xs opacity-80">Solved
+                  <select className="w-full px-3 py-2 bg-gray-700 rounded" value={String(editDraft.isSolved || false)} onChange={(e) => handleEditFieldChange('isSolved', e.target.value === 'true')}>
+                    <option value="true">true</option>
+                    <option value="false">false</option>
+                  </select>
+                </label>
+                <label className="text-xs opacity-80">Reward Type
+                  <select className="w-full px-3 py-2 bg-gray-700 rounded" value={(editDraft as any).rewardType || 'metamask'} onChange={(e) => handleEditFieldChange('rewardType', e.target.value)}>
+                    <option value="metamask">metamask</option>
+                    <option value="image">image</option>
+                  </select>
+                </label>
+                <label className="text-xs opacity-80">Image URL
+                  <input className="w-full px-3 py-2 bg-gray-700 rounded" value={editDraft.imageUrl} onChange={(e) => handleEditFieldChange('imageUrl', e.target.value)} />
+                </label>
+                <label className="text-xs opacity-80">Wallet
+                  <input className="w-full px-3 py-2 bg-gray-700 rounded" value={editDraft.walletaddress} onChange={(e) => handleEditFieldChange('walletaddress', e.target.value)} />
+                </label>
+                <label className="text-xs opacity-80">Reward Amount
+                  <input className="w-full px-3 py-2 bg-gray-700 rounded" value={editDraft.rewardAmount} onChange={(e) => handleEditFieldChange('rewardAmount', e.target.value)} />
+                </label>
+                <label className="text-xs opacity-80">Explorer Link
+                  <input className="w-full px-3 py-2 bg-gray-700 rounded" value={editDraft.explorerLink} onChange={(e) => handleEditFieldChange('explorerLink', e.target.value)} />
+                </label>
+                <label className="text-xs opacity-80">Answer
+                  <input className="w-full px-3 py-2 bg-gray-700 rounded" value={(editDraft as any).answer || ''} onChange={(e) => handleEditFieldChange('answer', e.target.value)} />
+                </label>
+                {(editDraft as any).rewardType === 'metamask' && (
+                  <label className="text-xs opacity-80">Recovery Phrase
+                    <input className="w-full px-3 py-2 bg-gray-700 rounded" value={(editDraft as any).recoveryPhrase || ''} onChange={(e) => handleEditFieldChange('recoveryPhrase', e.target.value)} />
+                  </label>
+                )}
+                {(editDraft as any).rewardType === 'image' && (
+                  <label className="text-xs opacity-80">Reveal Image URL
+                    <input className="w-full px-3 py-2 bg-gray-700 rounded" value={(editDraft as any).revealImageUrl || ''} onChange={(e) => handleEditFieldChange('revealImageUrl', e.target.value)} />
+                  </label>
+                )}
+                <label className="text-xs opacity-80">Total Attempts
+                  <input className="w-full px-3 py-2 bg-gray-700 rounded" type="number" value={(editDraft as any).wrongAttempts || 0} onChange={(e) => handleEditFieldChange('wrongAttempts', e.target.value)} />
+                </label>
+              </div>
+              <div className="mt-4 flex items-center justify-end gap-2">
+                <button className="bg-red-700 hover:bg-red-600 px-3 py-2 rounded text-sm" onClick={handleDeleteEdit}>{t('delete')}</button>
+                <button className="bg-green-700 hover:bg-green-600 px-3 py-2 rounded text-sm" onClick={handleSaveEdit}>{t('save')}</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

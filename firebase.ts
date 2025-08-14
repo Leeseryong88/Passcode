@@ -53,6 +53,7 @@ const functions = getFunctions(app, 'us-central1');
 export const getPuzzlesCallable = httpsCallable(functions, 'getPuzzles');
 export const checkAnswerCallable = httpsCallable(functions, 'checkAnswer');
 export const getSolvedAnswerCallable = httpsCallable(functions, 'getSolvedAnswer');
+export const setSolverNameCallable = httpsCallable(functions, 'setSolverName');
 
 // Board callables
 export const getBoardPostsCallable = httpsCallable(functions, 'getBoardPosts');

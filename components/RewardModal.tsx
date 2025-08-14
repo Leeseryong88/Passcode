@@ -1,23 +1,47 @@
-import React from 'react';
+import React, { useState } from 'react';
 import useCopyToClipboard from '../hooks/useCopyToClipboard';
 import { Check, Copy, ShieldAlert } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { submitSolverName } from '../api/puzzles';
 
 interface RewardModalProps {
   isOpen: boolean;
   onClose: () => void;
   recoveryPhrase: string;
+  puzzleId?: number;
 }
 
-const RewardModal: React.FC<RewardModalProps> = ({ isOpen, onClose, recoveryPhrase }) => {
+const RewardModal: React.FC<RewardModalProps> = ({ isOpen, onClose, recoveryPhrase, puzzleId }) => {
   const { t } = useTranslation();
   const [copied, copyToClipboard] = useCopyToClipboard();
   const words = recoveryPhrase.split(' ');
+  const [solverName, setSolverName] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
   const handleCopy = () => {
     copyToClipboard(recoveryPhrase);
+  };
+
+  const handleSaveName = async () => {
+    if (!puzzleId) return;
+    const name = solverName.trim();
+    if (!name) {
+      setSaveMsg('');
+      return;
+    }
+    setIsSaving(true);
+    setSaveMsg(null);
+    try {
+      await submitSolverName(puzzleId, name);
+      setSaveMsg('saved');
+    } catch (e: any) {
+      setSaveMsg(e.message || 'Failed');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -58,6 +82,24 @@ const RewardModal: React.FC<RewardModalProps> = ({ isOpen, onClose, recoveryPhra
                 <h3 className="font-bold">{t('security_warning_title')}</h3>
                 <p>{t('security_warning_description')}</p>
             </div>
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-sm mb-1">{t('enter_solver_name') || 'Your name or nickname (optional)'}</label>
+          <input
+            value={solverName}
+            onChange={(e) => setSolverName(e.target.value)}
+            className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-colors text-sm"
+            placeholder={t('enter_solver_name_placeholder') || 'Enter name to display on the board'}
+          />
+          <p className="mt-1 text-xs text-gray-400">{t('name_moderation_notice') || 'Inappropriate names may be removed by admins.'}</p>
+          <div className="mt-2 flex gap-2">
+            <button onClick={handleSaveName} disabled={isSaving || !solverName.trim()} className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-3 py-1.5 rounded text-sm">
+              {isSaving ? 'Saving...' : (t('save') || 'Save')}
+            </button>
+            {saveMsg === 'saved' && <span className="text-green-400 text-sm">{t('saved') || 'Saved'}</span>}
+            {saveMsg && saveMsg !== 'saved' && <span className="text-red-400 text-sm">{saveMsg}</span>}
+          </div>
         </div>
         
         <div className="flex flex-col sm:flex-row gap-3">

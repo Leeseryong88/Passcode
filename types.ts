@@ -10,6 +10,7 @@ export interface PrivatePuzzle {
   isSolved?: boolean;
   isPublished?: boolean;
   wrongAttempts?: number;
+  solverName?: string;
   answer: string;
   recoveryPhrase: string;
   // Reward handling

@@ -51,5 +51,5 @@
   "all_levels": "All Levels",
   "one_time_reveal_warning": "This reward is revealed only once. Please store it securely.",
   "already_solved_message": "This puzzle has already been correctly solved by someone else.",
-  "wrong_attempts_count": "Wrong attempts: {{count}}"
+  "wrong_attempts_count": "Total attempts: {{count}}"
 }

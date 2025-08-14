@@ -178,6 +178,7 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
         isOpen={isModalOpen}
         onClose={() => { setIsModalOpen(false); onSolve(); }}
         recoveryPhrase={recoveryPhrase}
+        puzzleId={puzzle.id}
       />
       <ImageModal 
         isOpen={isImageModalOpen}

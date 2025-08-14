@@ -508,3 +508,33 @@ export const getSolvedAnswer = functions.https.onCall(async (data: any, _context
     throw new functions.https.HttpsError('internal', 'Failed to get answer');
   }
 });
+
+/**
+ * Sets or updates the solver's display name for a puzzle.
+ * This is optional and can be moderated by admins.
+ */
+export const setSolverName = functions.https.onCall(async (data: any, _context) => {
+  try {
+    const { puzzleId, name } = data || {};
+    if (typeof puzzleId === 'undefined' || typeof name === 'undefined') {
+      throw new functions.https.HttpsError('invalid-argument', 'puzzleId and name are required');
+    }
+    const trimmed = String(name).trim();
+    if (!trimmed) {
+      throw new functions.https.HttpsError('invalid-argument', 'Name must not be empty');
+    }
+    // Basic sanitation and length limit
+    const sanitized = trimmed.replace(/[\r\n\t]/g, ' ').slice(0, 40);
+    const snap = await db.collection('puzzles').where('id', '==', puzzleId).limit(1).get();
+    if (snap.empty) {
+      throw new functions.https.HttpsError('not-found', 'Puzzle not found');
+    }
+    const ref = snap.docs[0].ref;
+    await ref.update({ solverName: sanitized, solverNamedAt: admin.firestore.FieldValue.serverTimestamp() });
+    return { success: true };
+  } catch (error) {
+    functions.logger.error('Error in setSolverName:', error);
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', 'Failed to set solver name');
+  }
+});
