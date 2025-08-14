@@ -51,5 +51,6 @@
   "filter_by_level": "레벨별 보기",
   "all_levels": "모든 레벨",
   "one_time_reveal_warning": "이 보상 정보는 최초 1회만 공개됩니다. 반드시 안전한 곳에 저장하세요.",
-  "already_solved_message": "이문제는 이미 다른사람에 의해서 정답이 제출 됐습니다."
+  "already_solved_message": "이문제는 이미 다른사람에 의해서 정답이 제출 됐습니다.",
+  "wrong_attempts_count": "오답: {{count}}회"
 }

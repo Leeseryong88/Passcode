@@ -80,6 +80,12 @@ export const checkAnswer = functions.https.onCall(async (data: any, _context) =>
     // Validate answer first
     const isCorrect = guess.trim().toLowerCase() === String(puzzle.answer).toLowerCase();
     if (!isCorrect) {
+      // Increment global wrong attempts counter atomically
+      try {
+        await doc.ref.update({ wrongAttempts: admin.firestore.FieldValue.increment(1) });
+      } catch (incErr) {
+        functions.logger.warn('Failed to increment wrongAttempts', incErr as any);
+      }
       throw new functions.https.HttpsError("unauthenticated", "Incorrect answer. Please try again.");
     }
 
@@ -192,6 +198,7 @@ export const createPuzzleAdmin = functions.https.onCall(async (data: any, contex
       rewardAmount: String(data.rewardAmount),
       isSolved: Boolean(data.isSolved ?? false),
       isPublished: Boolean(data.isPublished ?? false),
+      wrongAttempts: Number(data.wrongAttempts ?? 0),
       answer: String(data.answer),
       rewardType,
     };
@@ -256,6 +263,7 @@ export const updatePuzzleAdmin = functions.https.onCall(async (data: any, contex
       "rewardType",
       "revealImageUrl",
       "revealImagePath",
+      "wrongAttempts",
     ];
     const updatePayload: Record<string, unknown> = {};
     for (const field of updatableFields) {

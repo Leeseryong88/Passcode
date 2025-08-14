@@ -66,6 +66,10 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
     } catch (err: any) {
       setError(err.message || t('incorrect_answer'));
       setGuess('');
+      // Refresh puzzle list to reflect global wrongAttempts increment
+      if (!isReentering) {
+        onSolve();
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -100,6 +104,9 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
               <PuzzleIcon className="w-5 h-5" /> {t('level')} {puzzle.level}
             </h2>
             <span className="text-xs font-semibold bg-yellow-600/20 text-yellow-300 px-2 py-0.5 rounded">{puzzle.rewardAmount}</span>
+          </div>
+          <div className="flex justify-end mb-2">
+            <span className="text-xs font-semibold bg-red-600/20 text-red-300 px-2 py-0.5 rounded">{t('wrong_attempts_count', { count: (puzzle as any).wrongAttempts || 0 })}</span>
           </div>
           {(!puzzle.rewardType || puzzle.rewardType === 'metamask') && (
             <div className="bg-gray-900/40 p-2 rounded-lg mb-3 space-y-1 text-xs">

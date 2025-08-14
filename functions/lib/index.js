@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.uploadImageAdmin = exports.grantAdminRole = exports.setPuzzleSolvedAdmin = exports.deletePuzzleAdmin = exports.updatePuzzleAdmin = exports.createPuzzleAdmin = exports.getAllPuzzlesAdmin = exports.checkAnswer = exports.getPuzzles = void 0;
+exports.getSolvedAnswer = exports.uploadImageAdmin = exports.grantAdminRole = exports.setPuzzleSolvedAdmin = exports.deletePuzzlesBatchAdmin = exports.updatePuzzlesBatchAdmin = exports.deletePuzzleAdmin = exports.updatePuzzleAdmin = exports.createPuzzleAdmin = exports.getAllPuzzlesAdmin = exports.checkAnswer = exports.getPuzzles = void 0;
 /* eslint-disable max-len */
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
@@ -46,12 +46,18 @@ exports.getPuzzles = functions.https.onCall(async (_data, _context) => {
             .get();
         const puzzles = snapshot.docs.map((doc) => {
             const puzzleData = doc.data();
-            delete puzzleData.answer;
-            delete puzzleData.recoveryPhrase;
-            delete puzzleData.revealImageUrl;
-            delete puzzleData.imagePath;
-            delete puzzleData.revealImagePath;
-            return puzzleData;
+            const isSolved = Boolean(puzzleData === null || puzzleData === void 0 ? void 0 : puzzleData.isSolved);
+            const publicData = Object.assign({}, puzzleData);
+            // 민감 정보는 항상 제거
+            delete publicData.recoveryPhrase;
+            delete publicData.revealImageUrl;
+            delete publicData.imagePath;
+            delete publicData.revealImagePath;
+            // 정답은 퍼즐이 해결된 경우에만 공개
+            if (!isSolved) {
+                delete publicData.answer;
+            }
+            return publicData;
         });
         return puzzles;
     }
@@ -69,28 +75,35 @@ exports.checkAnswer = functions.https.onCall(async (data, _context) => {
             throw new functions.https.HttpsError("invalid-argument", "The function must be called with 'puzzleId' and 'guess' arguments.");
         }
         const { puzzleId, guess } = data;
-        const snapshot = await db.collection("puzzles").where("id", "==", puzzleId).limit(1).get();
-        if (snapshot.empty) {
+        const query = await db.collection("puzzles").where("id", "==", puzzleId).limit(1).get();
+        if (query.empty) {
             throw new functions.https.HttpsError("not-found", "Puzzle not found.");
         }
-        const puzzle = snapshot.docs[0].data();
-        if (guess.trim().toLowerCase() === String(puzzle.answer).toLowerCase()) {
-            if (puzzle.isSolved !== true) {
-                const puzzleRef = snapshot.docs[0].ref;
-                await puzzleRef.update({ isSolved: true });
-            }
-            const rewardType = puzzle.rewardType || 'metamask';
-            if (rewardType === 'metamask') {
-                return { type: 'metamask', recoveryPhrase: puzzle.recoveryPhrase };
-            }
-            else {
-                // Return stored URL directly. Ensure Storage rules permit public read for rewards/**.
-                return { type: 'image', revealImageUrl: puzzle.revealImageUrl };
-            }
-        }
-        else {
+        const doc = query.docs[0];
+        const puzzle = doc.data();
+        // Validate answer first
+        const isCorrect = guess.trim().toLowerCase() === String(puzzle.answer).toLowerCase();
+        if (!isCorrect) {
             throw new functions.https.HttpsError("unauthenticated", "Incorrect answer. Please try again.");
         }
+        // Atomically mark solved only once
+        const firstSolver = await db.runTransaction(async (tx) => {
+            const snap = await tx.get(doc.ref);
+            const d = snap.data();
+            if (!(d === null || d === void 0 ? void 0 : d.isSolved)) {
+                tx.update(doc.ref, { isSolved: true, solvedAt: admin.firestore.FieldValue.serverTimestamp() });
+                return true;
+            }
+            return false;
+        });
+        if (!firstSolver) {
+            return { type: 'already_solved' };
+        }
+        const rewardType = puzzle.rewardType || 'metamask';
+        if (rewardType === 'metamask') {
+            return { type: 'metamask', recoveryPhrase: puzzle.recoveryPhrase };
+        }
+        return { type: 'image', revealImageUrl: puzzle.revealImageUrl };
     }
     catch (error) {
         functions.logger.error("!!! CRITICAL ERROR in checkAnswer !!!:", error);
@@ -306,6 +319,75 @@ exports.deletePuzzleAdmin = functions.https.onCall(async (data, context) => {
     }
 });
 /**
+ * Batch update multiple puzzles by id. Admin only.
+ * @param {{updates: Array<Record<string, unknown>>}} data - Each item must include `id` and fields to update
+ */
+exports.updatePuzzlesBatchAdmin = functions.https.onCall(async (data, context) => {
+    assertIsAdmin(context);
+    try {
+        const updates = (data === null || data === void 0 ? void 0 : data.updates) || [];
+        if (!Array.isArray(updates) || updates.length === 0) {
+            throw new functions.https.HttpsError("invalid-argument", "updates must be a non-empty array");
+        }
+        const batch = db.batch();
+        for (const item of updates) {
+            const id = item === null || item === void 0 ? void 0 : item.id;
+            if (typeof id === 'undefined') {
+                throw new functions.https.HttpsError("invalid-argument", "Each update must include id");
+            }
+            const snap = await db.collection("puzzles").where("id", "==", id).limit(1).get();
+            if (snap.empty)
+                continue;
+            const ref = snap.docs[0].ref;
+            const payload = {};
+            for (const [k, v] of Object.entries(item)) {
+                if (k === 'id')
+                    continue;
+                payload[k] = v;
+            }
+            if (Object.keys(payload).length > 0) {
+                batch.update(ref, payload);
+            }
+        }
+        await batch.commit();
+        return { success: true };
+    }
+    catch (error) {
+        functions.logger.error("Error in updatePuzzlesBatchAdmin:", error);
+        if (error instanceof functions.https.HttpsError)
+            throw error;
+        throw new functions.https.HttpsError("internal", "Failed to batch update puzzles.");
+    }
+});
+/**
+ * Batch delete puzzles by ids. Admin only.
+ * @param {{ids: number[]}} data
+ */
+exports.deletePuzzlesBatchAdmin = functions.https.onCall(async (data, context) => {
+    assertIsAdmin(context);
+    try {
+        const ids = (data === null || data === void 0 ? void 0 : data.ids) || [];
+        if (!Array.isArray(ids) || ids.length === 0) {
+            throw new functions.https.HttpsError("invalid-argument", "ids must be a non-empty array");
+        }
+        const batch = db.batch();
+        for (const id of ids) {
+            const snap = await db.collection("puzzles").where("id", "==", id).limit(1).get();
+            if (snap.empty)
+                continue;
+            batch.delete(snap.docs[0].ref);
+        }
+        await batch.commit();
+        return { success: true };
+    }
+    catch (error) {
+        functions.logger.error("Error in deletePuzzlesBatchAdmin:", error);
+        if (error instanceof functions.https.HttpsError)
+            throw error;
+        throw new functions.https.HttpsError("internal", "Failed to batch delete puzzles.");
+    }
+});
+/**
  * Sets the solved status for a puzzle by `id`. Admin only.
  * @param {{id: number, isSolved: boolean}} data - Target puzzle id and status
  * @param {functions.https.CallableContext} context - Callable context for auth/claims
@@ -390,6 +472,35 @@ exports.uploadImageAdmin = functions.https.onCall(async (data, context) => {
         if (error instanceof functions.https.HttpsError)
             throw error;
         throw new functions.https.HttpsError('internal', 'Failed to upload image.');
+    }
+});
+/**
+ * Returns the answer for a puzzle only if it has already been solved.
+ * This allows clients to display the correct answer on solved cards
+ * even if the initial listing omitted the answer field.
+ */
+exports.getSolvedAnswer = functions.https.onCall(async (data, _context) => {
+    var _a;
+    try {
+        const { puzzleId } = data || {};
+        if (typeof puzzleId === 'undefined') {
+            throw new functions.https.HttpsError('invalid-argument', 'puzzleId is required');
+        }
+        const snapshot = await db.collection('puzzles').where('id', '==', puzzleId).limit(1).get();
+        if (snapshot.empty) {
+            throw new functions.https.HttpsError('not-found', 'Puzzle not found');
+        }
+        const puzzle = snapshot.docs[0].data();
+        if (!(puzzle === null || puzzle === void 0 ? void 0 : puzzle.isSolved)) {
+            throw new functions.https.HttpsError('permission-denied', 'Answer is only available after the puzzle is solved');
+        }
+        return { answer: String((_a = puzzle.answer) !== null && _a !== void 0 ? _a : '') };
+    }
+    catch (error) {
+        functions.logger.error('Error in getSolvedAnswer:', error);
+        if (error instanceof functions.https.HttpsError)
+            throw error;
+        throw new functions.https.HttpsError('internal', 'Failed to get answer');
     }
 });
 //# sourceMappingURL=index.js.map
