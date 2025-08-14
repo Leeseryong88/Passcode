@@ -3,7 +3,7 @@ import type { PublicPuzzle } from '../types';
 import RewardModal from './RewardModal';
 import InfoModal from './InfoModal';
 import ImageModal from './ImageModal';
-import { ExternalLink, CheckCircle, XCircle, Wallet, Puzzle as PuzzleIcon, LoaderCircle } from 'lucide-react';
+import { ExternalLink, CheckCircle, XCircle, Wallet, Puzzle as PuzzleIcon, LoaderCircle, Star } from 'lucide-react';
 import { checkPuzzleAnswer, getSolvedAnswer } from '../api/puzzles';
 import { useTranslation } from 'react-i18next';
 
@@ -92,6 +92,16 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
         {isSolved && (
           <span className="absolute top-2 left-2 text-xs font-semibold bg-green-700/70 text-green-100 px-2 py-0.5 rounded">Solved</span>
         )}
+        {(puzzle as any).solverName && (
+          <span className="absolute top-2 right-2 max-w-[75%]">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-500/20 to-cyan-500/20 text-amber-300 ring-1 ring-amber-400/50 px-2.5 py-0.5 shadow-sm backdrop-blur">
+              <Star className="w-4 h-4 text-amber-400 fill-current" />
+              <span className="truncate max-w-[12rem]" title={(puzzle as any).solverName}>
+                {(puzzle as any).solverName}
+              </span>
+            </span>
+          </span>
+        )}
         <img 
           src={puzzle.imageUrl} 
           alt={`${t('level')} ${puzzle.level}`} 
@@ -136,9 +146,17 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
                 <p className="text-sm font-semibold">{t('puzzle_solved')}</p>
               </div>
               {showAnswer && (
-                <div className="text-sm">
-                  <span className="text-gray-300">정답: </span>
-                  <span className="font-semibold text-green-300 break-words">{puzzle.answer || answerText}</span>
+                <div className="text-sm space-y-1">
+                  <div>
+                    <span className="text-gray-300">정답: </span>
+                    <span className="font-semibold text-green-300 break-words">{puzzle.answer || answerText}</span>
+                  </div>
+                  {(puzzle as any).solverName && (
+                    <div>
+                      <span className="text-gray-300">정답자: </span>
+                      <span className="font-semibold text-cyan-300 break-words">{(puzzle as any).solverName}</span>
+                    </div>
+                  )}
                 </div>
               )}
               {!showAnswer && (
@@ -184,12 +202,14 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
         isOpen={isImageModalOpen}
         onClose={() => setIsImageModalOpen(false)}
         imageUrl={puzzle.imageUrl}
+        puzzleId={puzzle.id}
       />
       <ImageModal
         isOpen={isRewardImageModalOpen}
         onClose={() => { setIsRewardImageModalOpen(false); onSolve(); }}
         imageUrl={rewardRevealImageUrl}
         notice={t('one_time_reveal_warning')}
+        puzzleId={puzzle.id}
       />
       <InfoModal isOpen={infoOpen} onClose={() => setInfoOpen(false)} message={infoMessage} />
     </>

@@ -315,6 +315,9 @@ const AdminApp: React.FC = () => {
                 <button className="text-sm bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded" onClick={closeEdit}>Close</button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <label className="text-xs opacity-80">ID
+                  <input className="w-full px-3 py-2 bg-gray-800 rounded opacity-70 cursor-not-allowed" value={String(editDraft.id)} disabled />
+                </label>
                 <label className="text-xs opacity-80">Level
                   <input className="w-full px-3 py-2 bg-gray-700 rounded" value={editDraft.level as any} onChange={(e) => handleEditFieldChange('level', e.target.value)} />
                 </label>
@@ -339,6 +342,9 @@ const AdminApp: React.FC = () => {
                 <label className="text-xs opacity-80">Image URL
                   <input className="w-full px-3 py-2 bg-gray-700 rounded" value={editDraft.imageUrl} onChange={(e) => handleEditFieldChange('imageUrl', e.target.value)} />
                 </label>
+                <label className="text-xs opacity-80">Image Path
+                  <input className="w-full px-3 py-2 bg-gray-700 rounded" value={(editDraft as any).imagePath || ''} onChange={(e) => handleEditFieldChange('imagePath', e.target.value)} />
+                </label>
                 <label className="text-xs opacity-80">Wallet
                   <input className="w-full px-3 py-2 bg-gray-700 rounded" value={editDraft.walletaddress} onChange={(e) => handleEditFieldChange('walletaddress', e.target.value)} />
                 </label>
@@ -361,9 +367,22 @@ const AdminApp: React.FC = () => {
                     <input className="w-full px-3 py-2 bg-gray-700 rounded" value={(editDraft as any).revealImageUrl || ''} onChange={(e) => handleEditFieldChange('revealImageUrl', e.target.value)} />
                   </label>
                 )}
+                {(editDraft as any).rewardType === 'image' && (
+                  <label className="text-xs opacity-80">Reveal Image Path
+                    <input className="w-full px-3 py-2 bg-gray-700 rounded" value={(editDraft as any).revealImagePath || ''} onChange={(e) => handleEditFieldChange('revealImagePath', e.target.value)} />
+                  </label>
+                )}
                 <label className="text-xs opacity-80">Total Attempts
                   <input className="w-full px-3 py-2 bg-gray-700 rounded" type="number" value={(editDraft as any).wrongAttempts || 0} onChange={(e) => handleEditFieldChange('wrongAttempts', e.target.value)} />
                 </label>
+                <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <label className="text-xs opacity-80">Solver Name
+                    <input className="w-full px-3 py-2 bg-gray-700 rounded" value={(editDraft as any).solverName || ''} onChange={(e) => handleEditFieldChange('solverName', e.target.value)} />
+                  </label>
+                  <div className="flex items-end">
+                    <button className="bg-red-700 hover:bg-red-600 px-3 py-2 rounded text-sm" onClick={() => handleEditFieldChange('solverName', '')}>Clear Solver Name</button>
+                  </div>
+                </div>
               </div>
               <div className="mt-4 flex items-center justify-end gap-2">
                 <button className="bg-red-700 hover:bg-red-600 px-3 py-2 rounded text-sm" onClick={handleDeleteEdit}>{t('delete')}</button>

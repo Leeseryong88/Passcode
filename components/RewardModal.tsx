@@ -17,7 +17,7 @@ const RewardModal: React.FC<RewardModalProps> = ({ isOpen, onClose, recoveryPhra
   const words = recoveryPhrase.split(' ');
   const [solverName, setSolverName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -25,20 +25,23 @@ const RewardModal: React.FC<RewardModalProps> = ({ isOpen, onClose, recoveryPhra
     copyToClipboard(recoveryPhrase);
   };
 
-  const handleSaveName = async () => {
-    if (!puzzleId) return;
+  const handleCloseWithSave = async () => {
+    if (!puzzleId) {
+      onClose();
+      return;
+    }
     const name = solverName.trim();
     if (!name) {
-      setSaveMsg('');
+      setValidationError(t('please_enter_solver_name') || '정답자 이름을 입력하세요');
       return;
     }
     setIsSaving(true);
-    setSaveMsg(null);
+    setValidationError(null);
     try {
       await submitSolverName(puzzleId, name);
-      setSaveMsg('saved');
+      onClose();
     } catch (e: any) {
-      setSaveMsg(e.message || 'Failed');
+      setValidationError(e.message || 'Failed to save name');
     } finally {
       setIsSaving(false);
     }
@@ -93,13 +96,7 @@ const RewardModal: React.FC<RewardModalProps> = ({ isOpen, onClose, recoveryPhra
             placeholder={t('enter_solver_name_placeholder') || 'Enter name to display on the board'}
           />
           <p className="mt-1 text-xs text-gray-400">{t('name_moderation_notice') || 'Inappropriate names may be removed by admins.'}</p>
-          <div className="mt-2 flex gap-2">
-            <button onClick={handleSaveName} disabled={isSaving || !solverName.trim()} className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-3 py-1.5 rounded text-sm">
-              {isSaving ? 'Saving...' : (t('save') || 'Save')}
-            </button>
-            {saveMsg === 'saved' && <span className="text-green-400 text-sm">{t('saved') || 'Saved'}</span>}
-            {saveMsg && saveMsg !== 'saved' && <span className="text-red-400 text-sm">{saveMsg}</span>}
-          </div>
+          {validationError && <div className="mt-2 text-red-400 text-sm">{validationError}</div>}
         </div>
         
         <div className="flex flex-col sm:flex-row gap-3">
@@ -111,10 +108,11 @@ const RewardModal: React.FC<RewardModalProps> = ({ isOpen, onClose, recoveryPhra
             {copied ? t('copied') : t('copy_to_clipboard')}
           </button>
           <button
-            onClick={onClose}
-            className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-lg transition-colors"
+            onClick={handleCloseWithSave}
+            className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:bg-gray-600"
+            disabled={isSaving}
           >
-            {t('close')}
+            {isSaving ? (t('save') || 'Save') : t('close')}
           </button>
         </div>
       </div>
