@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { isCurrentUserAdmin, onAuthStateChangedListener, signInWithEmailPassword, signOutCurrentUser } from '../firebase';
 import { uploadImageAdminCallable } from '../firebase';
-import { getAllPuzzlesAdmin, createPuzzleAdmin, updatePuzzleAdmin, deletePuzzleAdmin, grantAdminRole } from '../api/puzzles';
+import { getAllPuzzlesAdmin, createPuzzleAdmin, updatePuzzleAdmin, deletePuzzleAdmin } from '../api/puzzles';
 import type { PublicPuzzle } from '../types';
 
 type AdminPuzzle = PublicPuzzle & { answer?: string; recoveryPhrase?: string; docId?: string };
@@ -65,8 +65,7 @@ const AdminApp: React.FC = () => {
     }
     return data.url as string;
   };
-  const [grantEmail, setGrantEmail] = useState('');
-  const [grantSecret, setGrantSecret] = useState('');
+  
 
   useEffect(() => {
     const unsub = onAuthStateChangedListener(async (user) => {
@@ -181,18 +180,7 @@ const AdminApp: React.FC = () => {
 
   // legacy handlers removed in favor of modal-based edit
 
-  const handleGrantAdmin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    try {
-      await grantAdminRole(grantEmail, grantSecret);
-      setGrantEmail('');
-      setGrantSecret('');
-      alert('Granted admin role');
-    } catch (e: any) {
-      setError(e.message || 'Grant admin failed');
-    }
-  };
+  
 
   if (!isAuthed || !isAdmin) {
     return (
@@ -205,14 +193,7 @@ const AdminApp: React.FC = () => {
             <input className="w-full px-3 py-2 bg-gray-700 rounded" placeholder={t('password') || 'Password'} type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
             <button className="w-full bg-cyan-600 hover:bg-cyan-700 py-2 rounded font-semibold">{t('login')}</button>
           </form>
-          <div className="mt-6 border-t border-gray-700 pt-4">
-            <h3 className="font-semibold mb-2">{t('grant_admin')}</h3>
-            <form onSubmit={handleGrantAdmin} className="space-y-2">
-              <input className="w-full px-3 py-2 bg-gray-700 rounded" placeholder={t('email') || 'Email'} value={grantEmail} onChange={(e) => setGrantEmail(e.target.value)} />
-              <input className="w-full px-3 py-2 bg-gray-700 rounded" placeholder={t('secret') || 'Secret'} value={grantSecret} onChange={(e) => setGrantSecret(e.target.value)} />
-              <button className="w-full bg-yellow-600 hover:bg-yellow-700 py-2 rounded font-semibold">{t('grant_admin')}</button>
-            </form>
-          </div>
+          
         </div>
       </div>
     );

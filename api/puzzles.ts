@@ -8,7 +8,6 @@ import {
   updatePuzzleAdminCallable,
   deletePuzzleAdminCallable,
   setPuzzleSolvedAdminCallable,
-  grantAdminRoleCallable,
   // batch
   // We'll reference these via httpsCallable using functions names at runtime if not exported here
 } from '../firebase';
@@ -106,10 +105,7 @@ export const setPuzzleSolvedAdmin = async (id: number, isSolved: boolean): Promi
   return result.data as { success: boolean };
 };
 
-export const grantAdminRole = async (email: string, secret: string): Promise<{ success: boolean; uid: string }> => {
-  const result = await grantAdminRoleCallable({ email, secret });
-  return result.data as { success: boolean; uid: string };
-};
+// grantAdminRole removed per product decision
 
 // Batch Admin APIs (callable by name to avoid import churn)
 export const updatePuzzlesBatchAdmin = async (updates: any[]): Promise<{ success: boolean }> => {

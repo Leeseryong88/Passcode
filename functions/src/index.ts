@@ -437,37 +437,7 @@ export const setPuzzleSolvedAdmin = functions.https.onCall(async (data: any, con
  * @param {{email: string, secret: string}} data - Target email and admin secret
  * @param {functions.https.CallableContext} _context - Callable context (unused)
  */
-export const grantAdminRole = functions.https.onCall(async (data: any, context) => {
-  // Require authenticated admin caller AND shared secret
-  assertIsAdmin(context);
-  const secretFromEnv = (functions.config()?.admin && (functions.config().admin as any).secret) || "";
-  const providedSecret = String(data?.secret || "");
-  const targetEmail = String(data?.email || "").trim().toLowerCase();
-
-  if (!secretFromEnv) {
-    throw new functions.https.HttpsError(
-        "failed-precondition",
-        "Admin secret is not configured. Set with: firebase functions:config:set admin.secret=..."
-    );
-  }
-  if (!providedSecret || providedSecret !== secretFromEnv) {
-    throw new functions.https.HttpsError("permission-denied", "Invalid admin secret.");
-  }
-  if (!targetEmail) {
-    throw new functions.https.HttpsError("invalid-argument", "Target email is required.");
-  }
-
-  try {
-    const user = await admin.auth().getUserByEmail(targetEmail);
-    const existingClaims = (user.customClaims as Record<string, unknown>) || {};
-    await admin.auth().setCustomUserClaims(user.uid, {...existingClaims, admin: true});
-    return {success: true, uid: user.uid};
-  } catch (error) {
-    functions.logger.error("Error granting admin role:", error);
-    if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError("internal", "Failed to grant admin role.");
-  }
-});
+// grantAdminRole removed per product decision
 
 /**
  * Uploads an image to Firebase Storage on behalf of an admin user.

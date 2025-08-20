@@ -66,7 +66,7 @@ export const createPuzzleAdminCallable = httpsCallable(functions, 'createPuzzleA
 export const updatePuzzleAdminCallable = httpsCallable(functions, 'updatePuzzleAdmin');
 export const deletePuzzleAdminCallable = httpsCallable(functions, 'deletePuzzleAdmin');
 export const setPuzzleSolvedAdminCallable = httpsCallable(functions, 'setPuzzleSolvedAdmin');
-export const grantAdminRoleCallable = httpsCallable(functions, 'grantAdminRole');
+// grantAdminRole callable removed
 export const uploadImageAdminCallable = httpsCallable(functions, 'uploadImageAdmin');
 
 // Auth helpers

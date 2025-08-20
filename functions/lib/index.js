@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getSolvedAnswer = exports.uploadImageAdmin = exports.grantAdminRole = exports.setPuzzleSolvedAdmin = exports.deletePuzzlesBatchAdmin = exports.updatePuzzlesBatchAdmin = exports.deletePuzzleAdmin = exports.updatePuzzleAdmin = exports.createPuzzleAdmin = exports.getAllPuzzlesAdmin = exports.checkAnswer = exports.getPuzzles = void 0;
+exports.getSolvedAnswer = exports.uploadImageAdmin = exports.setPuzzleSolvedAdmin = exports.deletePuzzlesBatchAdmin = exports.updatePuzzlesBatchAdmin = exports.deletePuzzleAdmin = exports.updatePuzzleAdmin = exports.createPuzzleAdmin = exports.getAllPuzzlesAdmin = exports.checkAnswer = exports.getPuzzles = void 0;
 /* eslint-disable max-len */
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
@@ -446,35 +446,7 @@ exports.setPuzzleSolvedAdmin = functions.https.onCall(async (data, context) => {
  * @param {{email: string, secret: string}} data - Target email and admin secret
  * @param {functions.https.CallableContext} _context - Callable context (unused)
  */
-exports.grantAdminRole = functions.https.onCall(async (data, context) => {
-    var _a;
-    // Require authenticated admin caller AND shared secret
-    assertIsAdmin(context);
-    const secretFromEnv = (((_a = functions.config()) === null || _a === void 0 ? void 0 : _a.admin) && functions.config().admin.secret) || "";
-    const providedSecret = String((data === null || data === void 0 ? void 0 : data.secret) || "");
-    const targetEmail = String((data === null || data === void 0 ? void 0 : data.email) || "").trim().toLowerCase();
-    if (!secretFromEnv) {
-        throw new functions.https.HttpsError("failed-precondition", "Admin secret is not configured. Set with: firebase functions:config:set admin.secret=...");
-    }
-    if (!providedSecret || providedSecret !== secretFromEnv) {
-        throw new functions.https.HttpsError("permission-denied", "Invalid admin secret.");
-    }
-    if (!targetEmail) {
-        throw new functions.https.HttpsError("invalid-argument", "Target email is required.");
-    }
-    try {
-        const user = await admin.auth().getUserByEmail(targetEmail);
-        const existingClaims = user.customClaims || {};
-        await admin.auth().setCustomUserClaims(user.uid, Object.assign(Object.assign({}, existingClaims), { admin: true }));
-        return { success: true, uid: user.uid };
-    }
-    catch (error) {
-        functions.logger.error("Error granting admin role:", error);
-        if (error instanceof functions.https.HttpsError)
-            throw error;
-        throw new functions.https.HttpsError("internal", "Failed to grant admin role.");
-    }
-});
+// grantAdminRole removed per product decision
 /**
  * Uploads an image to Firebase Storage on behalf of an admin user.
  * @param {{path: string, contentType: string, base64: string}} data
