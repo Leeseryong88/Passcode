@@ -7,7 +7,8 @@ import { LoaderCircle } from 'lucide-react';
 import SupportCard from './components/SupportCard';
 import { useTranslation } from 'react-i18next';
 import FilterControls from './components/FilterControls';
-import { Analytics } from '@vercel/analytics/react';
+import { lazy } from 'react';
+const AnalyticsLazy = lazy(() => import('@vercel/analytics/react').then(m => ({ default: m.Analytics })));
 
 type FilterType = 'all' | 'solved' | 'unsolved';
 
@@ -84,7 +85,9 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100">
-      <Analytics />
+      <Suspense fallback={null}>
+        <AnalyticsLazy />
+      </Suspense>
       <Header />
       <main className="container mx-auto px-4 py-8">
         <FilterControls 

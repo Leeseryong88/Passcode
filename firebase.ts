@@ -1,8 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
-import { getAnalytics } from "firebase/analytics";
 import { getFunctions, httpsCallable } from "firebase/functions";
-import { getStorage } from "firebase/storage";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, User, getIdTokenResult } from "firebase/auth";
 
 // Your web app's Firebase configuration
@@ -20,9 +18,8 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+// 지연 초기화 대상: analytics, storage
 export const auth = getAuth(app);
-export const storage = getStorage(app);
 // App Check (optional; disabled by default since this project is not enforcing App Check)
 if (typeof window !== 'undefined') {
   try {
@@ -45,8 +42,7 @@ if (typeof window !== 'undefined') {
   }
 }
 
-// Initialize Cloud Functions and get a reference to the service
-// Ensure the region matches your Cloud Functions deployment region
+// Functions는 즉시 초기화하되, 다른 무거운 모듈은 지연
 const functions = getFunctions(app, 'us-central1');
 
 // Create callable function references. The name must match the deployed function name.
@@ -87,4 +83,21 @@ export async function isCurrentUserAdmin(): Promise<boolean> {
   if (!user) return false;
   const tokenResult = await getIdTokenResult(user, true);
   return Boolean((tokenResult.claims as any)?.admin);
+}
+
+// 선택적: Analytics 지연 초기화 유틸리티
+export async function ensureAnalytics() {
+  try {
+    const { getAnalytics } = await import('firebase/analytics');
+    return getAnalytics(app);
+  } catch (err) {
+    if ((import.meta as any).env?.DEV) console.info('Analytics init skipped', err);
+    return null;
+  }
+}
+
+// 선택적: Storage 지연 초기화 유틸리티 (Admin에서만 사용 권장)
+export async function ensureStorage() {
+  const { getStorage } = await import('firebase/storage');
+  return getStorage(app);
 }

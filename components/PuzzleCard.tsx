@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import type { PublicPuzzle } from '../types';
-import RewardModal from './RewardModal';
-import TextRewardModal from './TextRewardModal';
-import InfoModal from './InfoModal';
-import ImageModal from './ImageModal';
+const RewardModal = lazy(() => import('./RewardModal'));
+const TextRewardModal = lazy(() => import('./TextRewardModal'));
+const InfoModal = lazy(() => import('./InfoModal'));
+const ImageModal = lazy(() => import('./ImageModal'));
 import { ExternalLink, CheckCircle, XCircle, Wallet, LoaderCircle, Star } from 'lucide-react';
 import { checkPuzzleAnswer, getSolvedAnswer } from '../api/puzzles';
 import { useTranslation } from 'react-i18next';
@@ -112,6 +112,8 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
         <img 
           src={puzzle.imageUrl} 
           alt={`puzzle image`} 
+          loading="lazy"
+          decoding="async"
           className="w-full h-36 sm:h-40 object-cover cursor-pointer"
           onClick={() => setIsImageModalOpen(true)}
         />
@@ -208,35 +210,45 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
           )}
         </div>
       </div>
-      <RewardModal
-        isOpen={isModalOpen}
-        onClose={() => { setIsModalOpen(false); setRevealText(''); onSolve(); }}
-        recoveryPhrase={recoveryPhrase}
-        revealText={revealText}
-        puzzleId={puzzle.id}
-      />
-      <TextRewardModal
-        isOpen={isTextRewardModalOpen}
-        onClose={() => { setIsTextRewardModalOpen(false); setRevealText(''); onSolve(); }}
-        text={revealText}
-        puzzleId={puzzle.id}
-      />
-      <ImageModal 
-        isOpen={isImageModalOpen}
-        onClose={() => setIsImageModalOpen(false)}
-        imageUrl={puzzle.imageUrl}
-        puzzleId={puzzle.id}
-        enableSolverName={false}
-      />
-      <ImageModal
-        isOpen={isRewardImageModalOpen}
-        onClose={() => { setIsRewardImageModalOpen(false); onSolve(); }}
-        imageUrl={rewardRevealImageUrl}
-        notice={t('one_time_reveal_warning')}
-        puzzleId={puzzle.id}
-        enableSolverName={true}
-      />
-      <InfoModal isOpen={infoOpen} onClose={() => setInfoOpen(false)} message={infoMessage} />
+      <Suspense fallback={null}>
+        <RewardModal
+          isOpen={isModalOpen}
+          onClose={() => { setIsModalOpen(false); setRevealText(''); onSolve(); }}
+          recoveryPhrase={recoveryPhrase}
+          revealText={revealText}
+          puzzleId={puzzle.id}
+        />
+      </Suspense>
+      <Suspense fallback={null}>
+        <TextRewardModal
+          isOpen={isTextRewardModalOpen}
+          onClose={() => { setIsTextRewardModalOpen(false); setRevealText(''); onSolve(); }}
+          text={revealText}
+          puzzleId={puzzle.id}
+        />
+      </Suspense>
+      <Suspense fallback={null}>
+        <ImageModal 
+          isOpen={isImageModalOpen}
+          onClose={() => setIsImageModalOpen(false)}
+          imageUrl={puzzle.imageUrl}
+          puzzleId={puzzle.id}
+          enableSolverName={false}
+        />
+      </Suspense>
+      <Suspense fallback={null}>
+        <ImageModal
+          isOpen={isRewardImageModalOpen}
+          onClose={() => { setIsRewardImageModalOpen(false); onSolve(); }}
+          imageUrl={rewardRevealImageUrl}
+          notice={t('one_time_reveal_warning')}
+          puzzleId={puzzle.id}
+          enableSolverName={true}
+        />
+      </Suspense>
+      <Suspense fallback={null}>
+        <InfoModal isOpen={infoOpen} onClose={() => setInfoOpen(false)} message={infoMessage} />
+      </Suspense>
     </>
   );
 };

@@ -2,18 +2,22 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Award, Globe, Shield } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { auth, isCurrentUserAdmin, signOutCurrentUser } from '../firebase';
+import { isCurrentUserAdmin } from '../firebase';
 
 const Header: React.FC = () => {
   const { t, i18n } = useTranslation();
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    const unsub = auth.onAuthStateChanged(async () => {
-      const admin = await isCurrentUserAdmin();
-      setIsAdmin(admin);
-    });
-    return () => unsub();
+    let unsub: (() => void) | undefined;
+    (async () => {
+      const { auth } = await import('../firebase');
+      unsub = auth.onAuthStateChanged(async () => {
+        const admin = await isCurrentUserAdmin();
+        setIsAdmin(admin);
+      });
+    })();
+    return () => { if (unsub) unsub(); };
   }, []);
 
   const toggleLanguage = () => {

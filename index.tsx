@@ -1,7 +1,5 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App';
-import AdminApp from './admin/AdminApp';
 import './i18n';
 
 const rootElement = document.getElementById('root');
@@ -11,8 +9,17 @@ if (!rootElement) {
 
 const root = ReactDOM.createRoot(rootElement);
 const route = window.location.pathname;
+
+const SelectedApp = React.lazy(() =>
+  route.startsWith('/admin')
+    ? import('./admin/AdminApp')
+    : import('./App')
+);
+
 root.render(
   <React.StrictMode>
-    {route.startsWith('/admin') ? <AdminApp /> : <App />}
+    <Suspense fallback={null}>
+      <SelectedApp />
+    </Suspense>
   </React.StrictMode>
 );
