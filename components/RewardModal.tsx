@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import useCopyToClipboard from '../hooks/useCopyToClipboard';
 import { Check, Copy, ShieldAlert } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -19,8 +19,7 @@ const RewardModal: React.FC<RewardModalProps> = ({ isOpen, onClose, recoveryPhra
   const [solverName, setSolverName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
-
-  if (!isOpen) return null;
+  const copyBtnRef = useRef<HTMLButtonElement | null>(null);
 
   const handleCopy = () => {
     copyToClipboard(recoveryPhrase);
@@ -48,6 +47,19 @@ const RewardModal: React.FC<RewardModalProps> = ({ isOpen, onClose, recoveryPhra
     }
   };
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKey);
+    // focus primary action
+    setTimeout(() => copyBtnRef.current?.focus(), 0);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
   return (
     <div
       onClick={onClose}
@@ -56,10 +68,14 @@ const RewardModal: React.FC<RewardModalProps> = ({ isOpen, onClose, recoveryPhra
       <div
         onClick={(e) => e.stopPropagation()}
         className="bg-gray-800 border border-yellow-500/50 rounded-2xl shadow-2xl w-full max-w-md p-6 sm:p-8 transform transition-all"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="reward-title"
+        aria-describedby="reward-desc"
       >
         <div className="text-center">
-            <h2 className="text-2xl font-bold text-yellow-400 mb-2">{t('congratulations')}</h2>
-            <p className="text-gray-300 mb-6">{t('reward_modal_description')}</p>
+            <h2 id="reward-title" className="text-2xl font-bold text-yellow-400 mb-2">{t('congratulations')}</h2>
+            <p id="reward-desc" className="text-gray-300 mb-6">{t('reward_modal_description')}</p>
         </div>
 
         {revealText ? (
@@ -109,6 +125,7 @@ const RewardModal: React.FC<RewardModalProps> = ({ isOpen, onClose, recoveryPhra
         <div className="flex flex-col sm:flex-row gap-3">
           <button
             onClick={handleCopy}
+            ref={copyBtnRef}
             className="flex-1 flex items-center justify-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 px-4 rounded-lg transition-all"
           >
             {copied ? <Check size={20} /> : <Copy size={20} />}

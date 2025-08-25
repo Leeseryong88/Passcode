@@ -97,7 +97,7 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
     <>
       <div className={`relative bg-gray-800 border ${isSolved ? 'border-green-500/50' : 'border-gray-700'} rounded-xl shadow-lg overflow-hidden transition-colors duration-200 hover:shadow-cyan-500/10`}>
         {isSolved && (
-          <span className="absolute top-2 left-2 text-xs font-semibold bg-green-700/70 text-green-100 px-2 py-0.5 rounded">Solved</span>
+          <span className="absolute top-2 left-2 text-xs font-semibold bg-green-700/70 text-green-100 px-2 py-0.5 rounded">{t('solved')}</span>
         )}
         {(puzzle as any).solverName && (
           <span className="absolute top-2 right-2 max-w-[75%]">

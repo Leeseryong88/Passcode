@@ -59,4 +59,9 @@
   "please_enter_solver_name": "정답자 이름을 입력하세요",
   "saved": "저장됨",
   "view_wallet_address": "지갑 주소 보기"
+  ,
+  "empty_state_title": "표시할 퍼즐이 없습니다",
+  "empty_state_description": "필터를 변경하거나 잠시 후 다시 시도해 보세요.",
+  "more_puzzles_title": "새 퍼즐이 곧 제공됩니다",
+  "more_puzzles_description": "현재 퍼즐이 모두 해결되면 새로운 퍼즐이 공개됩니다."
 }

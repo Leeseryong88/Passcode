@@ -53,4 +53,9 @@
   "already_solved_message": "This puzzle has already been correctly solved by someone else.",
   "wrong_attempts_count": "Failed attempts: {{count}}",
   "solver_name": "Solver"
+  ,
+  "empty_state_title": "No puzzles to display",
+  "empty_state_description": "Try changing the filter or check back later.",
+  "more_puzzles_title": "More puzzles coming soon",
+  "more_puzzles_description": "New puzzles will be provided once all current puzzles are solved."
 }

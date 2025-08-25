@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { submitSolverName } from '../api/puzzles';
@@ -17,8 +17,7 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, imageUrl, noti
   const [solverName, setSolverName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
-
-  if (!isOpen) return null;
+  const closeBtnRef = useRef<HTMLButtonElement | null>(null);
 
   const handleCloseWithSave = async () => {
     // If solver name flow is disabled, just close
@@ -47,6 +46,18 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, imageUrl, noti
     }
   };
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKey);
+    setTimeout(() => closeBtnRef.current?.focus(), 0);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
   return (
     <div 
       className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4"
@@ -55,9 +66,12 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, imageUrl, noti
       <div 
         className="relative bg-gray-900 p-4 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
       >
         <button
           onClick={onClose}
+          ref={closeBtnRef}
           className="absolute top-2 right-2 text-white bg-gray-800 rounded-full p-1 hover:bg-gray-700 transition-colors"
           aria-label="Close image view"
         >

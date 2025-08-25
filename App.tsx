@@ -17,7 +17,10 @@ const App: React.FC = () => {
   const [puzzles, setPuzzles] = useState<PublicPuzzle[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeFilter, setActiveFilter] = useState<FilterType>('unsolved');
+  const [activeFilter, setActiveFilter] = useState<FilterType>(() => {
+    const saved = localStorage.getItem('activeFilter');
+    return (saved as FilterType) || 'unsolved';
+  });
   // Level filter removed
 
   const fetchPuzzles = useCallback(async () => {
@@ -77,6 +80,7 @@ const App: React.FC = () => {
 
   const handleFilterChange = (filter: FilterType) => {
     setActiveFilter(filter);
+    try { localStorage.setItem('activeFilter', filter); } catch {}
   };
 
   // Level change handler removed
@@ -93,11 +97,24 @@ const App: React.FC = () => {
         <FilterControls 
           activeFilter={activeFilter}
           onFilterChange={handleFilterChange}
+          counts={{
+            all: puzzles.length,
+            solved: puzzles.filter(p => p.isSolved).length,
+            unsolved: puzzles.filter(p => !p.isSolved).length,
+          }}
         />
         
         {isLoading && (
-          <div className="flex justify-center items-center h-64">
-            <LoaderCircle className="w-12 h-12 animate-spin text-cyan-400" />
+          <div className="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
+            {Array.from({ length: 8 }).map((_, idx) => (
+              <div key={idx} className="animate-pulse bg-gray-800 border border-gray-700 rounded-xl overflow-hidden">
+                <div className="h-36 sm:h-40 bg-gray-700" />
+                <div className="p-4 space-y-3">
+                  <div className="h-4 bg-gray-700 rounded w-1/3 ml-auto" />
+                  <div className="h-10 bg-gray-700 rounded" />
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
@@ -108,19 +125,26 @@ const App: React.FC = () => {
         )}
 
           {!isLoading && !error && (
-            <div className="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
-              {filteredPuzzles.map((puzzle) => (
-                <PuzzleCard 
-                  key={puzzle.id} 
-                  puzzle={puzzle} 
-                  isSolved={puzzle.isSolved || false}
-                  onSolve={handleSolve}
-                />
-              ))}
-              {!hasActiveUnsolved && (
-                <SupportCard walletAddress={supportWalletAddress} />
-              )}
-            </div>
+            filteredPuzzles.length > 0 ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
+                {filteredPuzzles.map((puzzle) => (
+                  <PuzzleCard 
+                    key={puzzle.id} 
+                    puzzle={puzzle} 
+                    isSolved={puzzle.isSolved || false}
+                    onSolve={handleSolve}
+                  />
+                ))}
+                {!hasActiveUnsolved && (
+                  <SupportCard walletAddress={supportWalletAddress} />
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-20 text-gray-400">
+                <p className="text-lg">{t('empty_state_title')}</p>
+                <p className="mt-2 text-sm">{t('empty_state_description')}</p>
+              </div>
+            )
           )}
         
       </main>

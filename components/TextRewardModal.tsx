@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import useCopyToClipboard from '../hooks/useCopyToClipboard';
 import { Check, Copy, FileText } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -17,8 +17,7 @@ const TextRewardModal: React.FC<TextRewardModalProps> = ({ isOpen, onClose, text
   const [solverName, setSolverName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
-
-  if (!isOpen) return null;
+  const copyBtnRef = useRef<HTMLButtonElement | null>(null);
 
   const handleCopy = () => {
     copyToClipboard(text);
@@ -46,6 +45,18 @@ const TextRewardModal: React.FC<TextRewardModalProps> = ({ isOpen, onClose, text
     }
   };
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    setTimeout(() => copyBtnRef.current?.focus(), 0);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
   return (
     <div
       onClick={onClose}
@@ -54,9 +65,12 @@ const TextRewardModal: React.FC<TextRewardModalProps> = ({ isOpen, onClose, text
       <div
         onClick={(e) => e.stopPropagation()}
         className="bg-gray-800 border border-cyan-500/40 rounded-2xl shadow-2xl w-full max-w-md p-6 sm:p-8 transform transition-all"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="text-reward-title"
       >
         <div className="text-center mb-4">
-          <h2 className="text-2xl font-bold text-cyan-300 mb-2 flex items-center justify-center gap-2">
+          <h2 id="text-reward-title" className="text-2xl font-bold text-cyan-300 mb-2 flex items-center justify-center gap-2">
             <FileText className="w-6 h-6" />
             {t('congratulations')}
           </h2>
@@ -81,6 +95,7 @@ const TextRewardModal: React.FC<TextRewardModalProps> = ({ isOpen, onClose, text
         <div className="flex flex-col sm:flex-row gap-3">
           <button
             onClick={handleCopy}
+            ref={copyBtnRef}
             className="flex-1 flex items-center justify-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 px-4 rounded-lg transition-all"
           >
             {copied ? <Check size={20} /> : <Copy size={20} />}
