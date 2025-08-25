@@ -74,8 +74,8 @@
   "landing_cta_learn": "자세히 보기",
   "landing_feat_rewards_title": "실제 보상",
   "landing_feat_rewards_desc": "퍼즐마다 보상 정보는 1회만 공개됩니다. 빠르고 안전하게 수령하세요.",
-  "landing_feat_security_title": "보안 우선",
-  "landing_feat_security_desc": "시크릿 문구 보호를 위한 명확한 가이드와 경고 제공.",
+  "landing_feat_security_title": "다각도로 해석하는 퍼즐의 즐거움",
+  "landing_feat_security_desc": "이미지와 단서를 다각도로 읽고 추론해 정답을 찾아보세요.",
   "landing_feat_pace_title": "빠르고 매끄럽게",
   "landing_feat_pace_desc": "필터/스켈레톤/접근성 모달로 최적화된 UX.",
   "about_title": "Passcode 소개",
@@ -83,10 +83,10 @@
   "about_how_it_works_title": "동작 방식",
   "about_how_it_works_1": "필터를 활용해 퍼즐 목록을 탐색합니다.",
   "about_how_it_works_2": "정답 제출 후 정확하면 보상이 1회 공개됩니다.",
-  "about_how_it_works_3": "시크릿 문구는 안전하게 보관하고 절대 공유하지 마세요.",
+  "about_how_it_works_3": "보상은 안전한 곳에 저장하세요.",
   "about_safety_title": "안전 수칙",
   "about_safety_1": "실제 자금이나 민감한 키는 사용하지 마세요.",
-  "about_safety_2": "지갑 문구가 공개되면 즉시 인출을 완료하세요.",
+  "about_safety_2": "암호화폐 지갑 문구가 있는 보상은 지갑 문구가 공개되면 즉시 인출을 완료하세요.",
   "about_safety_3": "부적절한 정답자 이름은 관리자에 의해 삭제될 수 있습니다.",
   "about_cta_play": "퍼즐 하러 가기"
 }
