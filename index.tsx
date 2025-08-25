@@ -10,11 +10,21 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 const route = window.location.pathname;
 
-const SelectedApp = React.lazy(() =>
-  route.startsWith('/admin')
-    ? import('./admin/AdminApp')
-    : import('./App')
-);
+const SelectedApp = React.lazy(() => {
+  if (route.startsWith('/admin')) {
+    return import('./admin/AdminApp');
+  }
+  if (route === '/') {
+    return import('./src/pages/Landing');
+  }
+  if (route.startsWith('/about')) {
+    return import('./src/pages/About');
+  }
+  if (route.startsWith('/play') || route.startsWith('/app')) {
+    return import('./App');
+  }
+  return import('./App');
+});
 
 root.render(
   <React.StrictMode>
