@@ -28,15 +28,17 @@ const Header: React.FC = () => {
     <header className="py-6 bg-gray-900/50 backdrop-blur-sm border-b border-gray-700/50 sticky top-0 z-20">
       <div className="container mx-auto px-4 flex justify-between items-center">
         <div className="flex items-center justify-center gap-4">
-          <Award className="w-8 h-8 text-yellow-400" />
-          <div className="flex items-baseline gap-3">
-            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-500">
-              {t('app_title')}
-            </h1>
-            <span className="hidden sm:inline text-sm text-gray-300/90 border-l border-gray-700 pl-3">
-              {t('app_description')}
-            </span>
-          </div>
+          <a href="/" className="flex items-center gap-4">
+            <Award className="w-8 h-8 text-yellow-400" />
+            <div className="flex items-baseline gap-3">
+              <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-500">
+                {t('app_title')}
+              </h1>
+            </div>
+          </a>
+          <span className="hidden sm:inline text-sm text-gray-300/90 border-l border-gray-700 pl-3">
+            {t('app_description')}
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <a href="/" className="hidden sm:inline px-3 py-2 text-gray-300 hover:text-white transition-colors">{t('nav_home') || 'Home'}</a>
