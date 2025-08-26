@@ -85,8 +85,6 @@ const App: React.FC = () => {
 
   // Level change handler removed
 
-  const supportWalletAddress = "0x47Cb533DD27446c912C4cc41Bda9407e8F7BAF95";
-
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100">
       <Suspense fallback={null}>
@@ -136,7 +134,7 @@ const App: React.FC = () => {
                   />
                 ))}
                 {!hasActiveUnsolved && (
-                  <SupportCard walletAddress={supportWalletAddress} />
+                  <SupportCard />
                 )}
               </div>
             ) : (

@@ -15,6 +15,7 @@
     "noEmit": true,
     "allowJs": true,
     "jsx": "react-jsx",
+    "types": ["vite/client"],
 
     /* Linting */
     "strict": true,
@@ -26,5 +27,8 @@
     "paths": {
       "@/*" :  ["./*"]
     }
-  }
+  },
+  "exclude": [
+    "functions/**"
+  ]
 }

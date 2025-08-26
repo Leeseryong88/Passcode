@@ -1,11 +1,9 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
-interface SupportCardProps {
-  walletAddress: string;
-}
+interface SupportCardProps {}
 
-const SupportCard: React.FC<SupportCardProps> = ({ walletAddress }) => {
+const SupportCard: React.FC<SupportCardProps> = () => {
   const { t } = useTranslation();
   return (
     <div className="bg-gray-800 border border-cyan-500/30 rounded-lg shadow-lg p-6 flex flex-col text-center transform hover:scale-105 transition-transform duration-300 h-full min-h-[300px]">
