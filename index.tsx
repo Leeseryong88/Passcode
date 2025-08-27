@@ -20,6 +20,9 @@ const SelectedApp = React.lazy(() => {
   if (route.startsWith('/about')) {
     return import('./src/pages/About');
   }
+  if (route.startsWith('/board')) {
+    return import('./src/pages/Board');
+  }
   if (route.startsWith('/play') || route.startsWith('/app')) {
     return import('./App');
   }

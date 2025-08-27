@@ -17,7 +17,7 @@ const firebaseConfig = {
 
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
+export const app = initializeApp(firebaseConfig);
 // 지연 초기화 대상: analytics, storage
 export const auth = getAuth(app);
 // App Check (optional; disabled by default since this project is not enforcing App Check)
@@ -55,6 +55,9 @@ export const setSolverNameCallable = httpsCallable(functions, 'setSolverName');
 export const getBoardPostsCallable = httpsCallable(functions, 'getBoardPosts');
 export const addBoardPostCallable = httpsCallable(functions, 'addBoardPost');
 export const addCommentToPostCallable = httpsCallable(functions, 'addCommentToPost');
+export const uploadBoardImageCallable = httpsCallable(functions, 'uploadBoardImage');
+export const updateBoardPostCallable = httpsCallable(functions, 'updateBoardPost');
+export const deleteBoardPostCallable = httpsCallable(functions, 'deleteBoardPost');
 
 // Admin callables
 export const getAllPuzzlesAdminCallable = httpsCallable(functions, 'getAllPuzzlesAdmin');

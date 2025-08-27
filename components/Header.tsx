@@ -43,6 +43,7 @@ const Header: React.FC = () => {
         <div className="flex items-center gap-2">
           <a href="/" className="hidden sm:inline px-3 py-2 text-gray-300 hover:text-white transition-colors">{t('nav_home') || 'Home'}</a>
           <a href="/about" className="hidden sm:inline px-3 py-2 text-gray-300 hover:text-white transition-colors">{t('nav_about') || 'About'}</a>
+          <a href="/board" className="hidden sm:inline px-3 py-2 text-gray-300 hover:text-white transition-colors">게시판</a>
           <a href="/play" className="hidden sm:inline px-3 py-2 text-gray-300 hover:text-white transition-colors">{t('nav_play') || 'Play'}</a>
           {isAdmin && (
             <a href="/admin" className="flex items-center gap-2 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-500 transition-colors">

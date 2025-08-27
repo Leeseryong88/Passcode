@@ -1,6 +1,7 @@
 /* eslint-disable max-len */
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
+import { createHash, randomBytes } from "crypto";
 
 // Initialize Firebase Admin SDK
 admin.initializeApp();
@@ -28,6 +29,17 @@ function extractStoragePath(value?: string | null): string | null {
   // Direct path
   if (/^(puzzles|rewards)\//.test(v)) return v;
   return null;
+}
+
+function hashPassword(raw: string, salt?: string) {
+  const s = salt || randomBytes(8).toString('hex');
+  const h = createHash('sha256').update(`${s}:${String(raw)}`).digest('hex');
+  return { salt: s, hash: h };
+}
+
+function validateImageContentType(ct?: string) {
+  if (!ct) return false;
+  return /^image\/(png|jpe?g|webp|gif)$/i.test(ct);
 }
 
 /**
@@ -465,6 +477,141 @@ export const uploadImageAdmin = functions.https.onCall(async (data: any, context
     functions.logger.error('Error in uploadImageAdmin:', error);
     if (error instanceof functions.https.HttpsError) throw error;
     throw new functions.https.HttpsError('internal', 'Failed to upload image.');
+  }
+});
+
+/**
+ * Board: Public image upload (no auth). Stores under board/ and returns public URL.
+ */
+export const uploadBoardImage = functions.https.onCall(async (data: any, _context) => {
+  try {
+    const { base64, contentType } = data || {};
+    if (!base64 || !contentType || !validateImageContentType(String(contentType))) {
+      throw new functions.https.HttpsError('invalid-argument', 'Invalid image payload');
+    }
+    const bucket = getDefaultBucket();
+    const now = new Date();
+    const key = `board/${now.getFullYear()}/${now.getMonth()+1}/${Date.now()}_${Math.random().toString(36).slice(2)}.img`;
+    const buffer = Buffer.from(String(base64), 'base64');
+    await bucket.file(key).save(buffer, { contentType: String(contentType), resumable: false, public: true, metadata: { cacheControl: 'public, max-age=31536000' } });
+    const publicUrl = `https://storage.googleapis.com/${bucket.name}/${encodeURIComponent(key)}`;
+    return { success: true, url: publicUrl, path: key };
+  } catch (error) {
+    functions.logger.error('uploadBoardImage error', error);
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', 'Failed to upload');
+  }
+});
+
+/**
+ * Board: Create post with password protection.
+ */
+export const addBoardPost = functions.https.onCall(async (data: any, _context) => {
+  try {
+    const { title, content, password, imageUrls } = data || {};
+    const t = String(title || '').trim();
+    const c = String(content || '').trim();
+    const p = String(password || '').trim();
+    if (!t || !c || !p) throw new functions.https.HttpsError('invalid-argument', 'title, content, password are required');
+    if (t.length > 80) throw new functions.https.HttpsError('invalid-argument', 'title too long');
+    if (c.length > 5000) throw new functions.https.HttpsError('invalid-argument', 'content too long');
+    const images: string[] = Array.isArray(imageUrls) ? imageUrls.map((u: any) => String(u)).slice(0, 6) : [];
+    const { salt, hash } = hashPassword(p);
+    const payload = {
+      title: t,
+      content: c,
+      imageUrls: images,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      passwordSalt: salt,
+      passwordHash: hash,
+    } as any;
+    const ref = await db.collection('boardPosts').add(payload);
+    return { success: true, id: ref.id };
+  } catch (error) {
+    functions.logger.error('addBoardPost error', error);
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', 'Failed to add post');
+  }
+});
+
+/** Fetch posts (public). */
+export const getBoardPosts = functions.https.onCall(async (data: any, _context) => {
+  try {
+    const { limit = 30, id } = data || {};
+    if (id) {
+      const snap = await db.collection('boardPosts').doc(String(id)).get();
+      if (!snap.exists) throw new functions.https.HttpsError('not-found', 'Post not found');
+      const d = snap.data() as any;
+      delete d.passwordHash; delete d.passwordSalt;
+      return { id: snap.id, ...d };
+    }
+    const snap = await db.collection('boardPosts').orderBy('createdAt', 'desc').limit(Number(limit)).get();
+    const items = snap.docs.map((doc) => {
+      const d = doc.data() as any;
+      delete d.passwordHash; delete d.passwordSalt;
+      return { id: doc.id, ...d };
+    });
+    return items;
+  } catch (error) {
+    functions.logger.error('getBoardPosts error', error);
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', 'Failed to fetch posts');
+  }
+});
+
+/** Update post with password verification. */
+export const updateBoardPost = functions.https.onCall(async (data: any, _context) => {
+  try {
+    const { id, password, title, content, imageUrls } = data || {};
+    if (!id || !password) throw new functions.https.HttpsError('invalid-argument', 'id and password required');
+    const ref = db.collection('boardPosts').doc(String(id));
+    const snap = await ref.get();
+    if (!snap.exists) throw new functions.https.HttpsError('not-found', 'Post not found');
+    const d = snap.data() as any;
+    const { hash } = hashPassword(String(password), d.passwordSalt);
+    if (hash !== d.passwordHash) throw new functions.https.HttpsError('permission-denied', 'Invalid password');
+    const update: any = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
+    if (typeof title !== 'undefined') update.title = String(title).slice(0, 80);
+    if (typeof content !== 'undefined') update.content = String(content).slice(0, 5000);
+    if (Array.isArray(imageUrls)) update.imageUrls = imageUrls.map((u: any) => String(u)).slice(0, 6);
+    await ref.update(update);
+    return { success: true };
+  } catch (error) {
+    functions.logger.error('updateBoardPost error', error);
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', 'Failed to update post');
+  }
+});
+
+/** Delete post with password verification; try deleting images. */
+export const deleteBoardPost = functions.https.onCall(async (data: any, _context) => {
+  try {
+    const { id, password } = data || {};
+    if (!id || !password) throw new functions.https.HttpsError('invalid-argument', 'id and password required');
+    const ref = db.collection('boardPosts').doc(String(id));
+    const snap = await ref.get();
+    if (!snap.exists) throw new functions.https.HttpsError('not-found', 'Post not found');
+    const d = snap.data() as any;
+    const { hash } = hashPassword(String(password), d.passwordSalt);
+    if (hash !== d.passwordHash) throw new functions.https.HttpsError('permission-denied', 'Invalid password');
+    // delete images if in our bucket
+    try {
+      const bucket = getDefaultBucket();
+      const imgs: string[] = Array.isArray(d.imageUrls) ? d.imageUrls : [];
+      for (const u of imgs) {
+        const path = extractStoragePath(String(u));
+        if (path) await bucket.file(path).delete({ ignoreNotFound: true });
+      }
+    } catch (err) {
+      functions.logger.warn('Failed to delete board images', err as any);
+    }
+    await ref.delete();
+    return { success: true };
+  } catch (error) {
+    functions.logger.error('deleteBoardPost error', error);
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', 'Failed to delete post');
   }
 });
 
