@@ -483,44 +483,26 @@ export const uploadImageAdmin = functions.https.onCall(async (data: any, context
 /**
  * Board: Public image upload (no auth). Stores under board/ and returns public URL.
  */
-export const uploadBoardImage = functions.https.onCall(async (data: any, _context) => {
-  try {
-    const { base64, contentType } = data || {};
-    if (!base64 || !contentType || !validateImageContentType(String(contentType))) {
-      throw new functions.https.HttpsError('invalid-argument', 'Invalid image payload');
-    }
-    const bucket = getDefaultBucket();
-    const now = new Date();
-    const key = `board/${now.getFullYear()}/${now.getMonth()+1}/${Date.now()}_${Math.random().toString(36).slice(2)}.img`;
-    const buffer = Buffer.from(String(base64), 'base64');
-    await bucket.file(key).save(buffer, { contentType: String(contentType), resumable: false, public: true, metadata: { cacheControl: 'public, max-age=31536000' } });
-    const publicUrl = `https://storage.googleapis.com/${bucket.name}/${encodeURIComponent(key)}`;
-    return { success: true, url: publicUrl, path: key };
-  } catch (error) {
-    functions.logger.error('uploadBoardImage error', error);
-    if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError('internal', 'Failed to upload');
-  }
-});
+// Image upload removed by requirements
 
 /**
  * Board: Create post with password protection.
  */
 export const addBoardPost = functions.https.onCall(async (data: any, _context) => {
   try {
-    const { title, content, password, imageUrls } = data || {};
+    const { title, content, password } = data || {};
     const t = String(title || '').trim();
     const c = String(content || '').trim();
     const p = String(password || '').trim();
     if (!t || !c || !p) throw new functions.https.HttpsError('invalid-argument', 'title, content, password are required');
     if (t.length > 80) throw new functions.https.HttpsError('invalid-argument', 'title too long');
     if (c.length > 5000) throw new functions.https.HttpsError('invalid-argument', 'content too long');
-    const images: string[] = Array.isArray(imageUrls) ? imageUrls.map((u: any) => String(u)).slice(0, 6) : [];
     const { salt, hash } = hashPassword(p);
     const payload = {
       title: t,
       content: c,
-      imageUrls: images,
+      imageUrls: [],
+      comments: [],
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       passwordSalt: salt,
@@ -550,7 +532,7 @@ export const getBoardPosts = functions.https.onCall(async (data: any, _context) 
     const items = snap.docs.map((doc) => {
       const d = doc.data() as any;
       delete d.passwordHash; delete d.passwordSalt;
-      return { id: doc.id, ...d };
+      return { id: doc.id, title: d.title, createdAt: d.createdAt };
     });
     return items;
   } catch (error) {
@@ -612,6 +594,50 @@ export const deleteBoardPost = functions.https.onCall(async (data: any, _context
     functions.logger.error('deleteBoardPost error', error);
     if (error instanceof functions.https.HttpsError) throw error;
     throw new functions.https.HttpsError('internal', 'Failed to delete post');
+  }
+});
+
+/** Add a comment with nickname and password */
+export const addBoardComment = functions.https.onCall(async (data: any, _context) => {
+  try {
+    const { id, nickname, content, password } = data || {};
+    const ref = db.collection('boardPosts').doc(String(id));
+    const snap = await ref.get();
+    if (!snap.exists) throw new functions.https.HttpsError('not-found', 'Post not found');
+    const name = String(nickname || '').trim().slice(0, 24);
+    const text = String(content || '').trim().slice(0, 1000);
+    const pw = String(password || '').trim();
+    if (!name || !text || !pw) throw new functions.https.HttpsError('invalid-argument', 'nickname, content, password required');
+    const { salt, hash } = hashPassword(pw);
+    const c = { id: String(Date.now()) + Math.random().toString(36).slice(2), nickname: name, content: text, createdAt: admin.firestore.FieldValue.serverTimestamp(), passwordSalt: salt, passwordHash: hash };
+    await ref.update({ comments: admin.firestore.FieldValue.arrayUnion(c), updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+    return { success: true };
+  } catch (error) {
+    functions.logger.error('addBoardComment error', error);
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', 'Failed to add comment');
+  }
+});
+
+/** Delete a comment with password verification */
+export const deleteBoardComment = functions.https.onCall(async (data: any, _context) => {
+  try {
+    const { id, commentId, password } = data || {};
+    const ref = db.collection('boardPosts').doc(String(id));
+    const snap = await ref.get();
+    if (!snap.exists) throw new functions.https.HttpsError('not-found', 'Post not found');
+    const d = snap.data() as any;
+    const target = (d.comments || []).find((c: any) => c.id === String(commentId));
+    if (!target) throw new functions.https.HttpsError('not-found', 'Comment not found');
+    const { hash } = hashPassword(String(password || ''), target.passwordSalt);
+    if (hash !== target.passwordHash) throw new functions.https.HttpsError('permission-denied', 'Invalid password');
+    const newComments = (d.comments || []).filter((c: any) => c.id !== String(commentId));
+    await ref.update({ comments: newComments, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+    return { success: true };
+  } catch (error) {
+    functions.logger.error('deleteBoardComment error', error);
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', 'Failed to delete comment');
   }
 });
 

@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Header from '../../components/Header';
-import { fetchBoardPosts, createBoardPost, uploadBoardImage, updateBoardPost, deleteBoardPost } from '../../api/board';
-import { Image as ImageIcon, Send, Trash2, Edit3, Lock } from 'lucide-react';
+import { fetchBoardPosts, createBoardPost, fetchBoardPost, addBoardComment, deleteBoardComment, deleteBoardPost } from '../../api/board';
+import { Send, Trash2, Lock } from 'lucide-react';
 
 type Post = {
   id: string;
   title: string;
-  content: string;
-  imageUrls?: string[];
+  content?: string;
+  comments?: { id: string; nickname: string; content: string }[];
   createdAt?: any;
   updatedAt?: any;
 };
@@ -22,6 +22,10 @@ const Board: React.FC = () => {
   const [images, setImages] = useState<File[]>([]);
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activePost, setActivePost] = useState<Post | null>(null);
+  const [commentNickname, setCommentNickname] = useState('');
+  const [commentPassword, setCommentPassword] = useState('');
+  const [commentText, setCommentText] = useState('');
 
   const load = async () => {
     setIsLoading(true);
@@ -38,11 +42,7 @@ const Board: React.FC = () => {
 
   useEffect(() => { load(); }, []);
 
-  const handleImages = (files: FileList | null) => {
-    if (!files) return;
-    const arr = Array.from(files).slice(0, 6);
-    setImages(arr);
-  };
+  // image upload removed
 
   const toBase64 = (file: File) => new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -56,19 +56,48 @@ const Board: React.FC = () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      const uploaded: string[] = [];
-      for (const f of images) {
-        const b64 = await toBase64(f);
-        const res = await uploadBoardImage(b64, f.type || 'image/png');
-        if (res?.url) uploaded.push(res.url);
-      }
-      await createBoardPost({ title, content, password, imageUrls: uploaded });
-      setTitle(''); setContent(''); setPassword(''); setImages([]);
+      await createBoardPost({ title, content, password });
+      setTitle(''); setContent(''); setPassword('');
       await load();
     } catch (e: any) {
       alert(e.message || 'Failed to submit');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const openPost = async (id: string) => {
+    try {
+      const p = await fetchBoardPost(id);
+      setActivePost(p);
+      setIsComposerOpen(false);
+    } catch (e: any) {
+      alert(e.message || '불러오기 실패');
+    }
+  };
+
+  const submitComment = async () => {
+    if (!activePost) return;
+    try {
+      await addBoardComment({ id: activePost.id, nickname: commentNickname, content: commentText, password: commentPassword });
+      const refreshed = await fetchBoardPost(activePost.id);
+      setActivePost(refreshed);
+      setCommentNickname(''); setCommentPassword(''); setCommentText('');
+    } catch (e: any) {
+      alert(e.message || '댓글 등록 실패');
+    }
+  };
+
+  const removeComment = async (commentId: string) => {
+    if (!activePost) return;
+    const pw = prompt('댓글 비밀번호를 입력하세요');
+    if (!pw) return;
+    try {
+      await deleteBoardComment({ id: activePost.id, commentId, password: pw });
+      const refreshed = await fetchBoardPost(activePost.id);
+      setActivePost(refreshed);
+    } catch (e: any) {
+      alert(e.message || '댓글 삭제 실패');
     }
   };
 
@@ -103,20 +132,6 @@ const Board: React.FC = () => {
             </div>
           </div>
           <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="내용" rows={4} className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-cyan-500" />
-          <div className="flex items-center gap-3">
-            <label className="inline-flex items-center gap-2 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg cursor-pointer">
-              <ImageIcon className="w-4 h-4" /> 이미지 업로드
-              <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleImages(e.target.files)} />
-            </label>
-            <span className="text-xs text-gray-400">최대 6장</span>
-          </div>
-          {images.length > 0 && (
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-              {images.map((f, i) => (
-                <img key={i} src={URL.createObjectURL(f)} className="w-full h-20 object-cover rounded" />
-              ))}
-            </div>
-          )}
           <button disabled={isSubmitting || !title || !content || !password} className="inline-flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white font-semibold px-5 py-2 rounded-lg disabled:bg-gray-600">
             <Send className="w-4 h-4" /> 등록
           </button>
@@ -128,28 +143,46 @@ const Board: React.FC = () => {
         ) : error ? (
           <div className="text-center text-red-400">{error}</div>
         ) : (
-          <div className="space-y-4">
-            {posts.map((p) => (
-              <div key={p.id} className="p-4 bg-gray-800 border border-gray-700 rounded-xl">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-bold">{p.title}</h3>
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => onDelete(p.id)} className="text-red-300 hover:text-red-200 px-2 py-1 rounded">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-                <p className="mt-2 text-gray-200 whitespace-pre-wrap">{p.content}</p>
-                {p.imageUrls && p.imageUrls.length > 0 && (
-                  <div className="mt-3 grid grid-cols-3 sm:grid-cols-6 gap-2">
-                    {p.imageUrls.map((u, i) => (
-                      <img key={i} src={u} className="w-full h-24 object-cover rounded" />
-                    ))}
-                  </div>
-                )}
+          activePost ? (
+            <div className="p-4 bg-gray-800 border border-gray-700 rounded-xl">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-bold">{activePost.title}</h3>
+                <button onClick={() => onDelete(activePost.id)} className="text-red-300 hover:text-red-200 px-2 py-1 rounded"><Trash2 className="w-4 h-4" /></button>
               </div>
-            ))}
-          </div>
+              <p className="mt-2 text-gray-200 whitespace-pre-wrap">{activePost.content}</p>
+              <div className="mt-6 p-3 bg-gray-900 rounded-lg border border-gray-700">
+                <h4 className="font-semibold mb-3">댓글</h4>
+                <div className="grid sm:grid-cols-3 gap-2 mb-3">
+                  <input value={commentNickname} onChange={(e) => setCommentNickname(e.target.value)} placeholder="닉네임" className="px-3 py-2 bg-gray-700 border border-gray-600 rounded" />
+                  <input value={commentPassword} onChange={(e) => setCommentPassword(e.target.value)} placeholder="비밀번호" className="px-3 py-2 bg-gray-700 border border-gray-600 rounded" />
+                  <button onClick={submitComment} className="bg-cyan-600 hover:bg-cyan-700 text-white font-semibold px-3 rounded">등록</button>
+                </div>
+                <textarea value={commentText} onChange={(e) => setCommentText(e.target.value)} placeholder="내용" rows={3} className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded mb-3" />
+                <div className="space-y-2">
+                  {(activePost.comments || []).map((c) => (
+                    <div key={c.id} className="p-2 bg-gray-800 border border-gray-700 rounded flex justify-between">
+                      <div>
+                        <div className="text-sm text-cyan-300">{c.nickname}</div>
+                        <div className="text-gray-200 whitespace-pre-wrap">{c.content}</div>
+                      </div>
+                      <button onClick={() => removeComment(c.id)} className="text-red-300 hover:text-red-200">삭제</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="mt-6">
+                <button onClick={() => setActivePost(null)} className="text-sm text-gray-300 underline">목록으로</button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {posts.map((p) => (
+                <button key={p.id} onClick={() => openPost(p.id)} className="w-full text-left p-4 bg-gray-800 border border-gray-700 rounded-xl hover:bg-gray-700">
+                  <div className="text-lg font-bold">{p.title}</div>
+                </button>
+              ))}
+            </div>
+          )
         )}
       </main>
     </div>

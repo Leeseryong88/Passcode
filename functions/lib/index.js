@@ -1,9 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getSolvedAnswer = exports.uploadImageAdmin = exports.setPuzzleSolvedAdmin = exports.deletePuzzlesBatchAdmin = exports.updatePuzzlesBatchAdmin = exports.deletePuzzleAdmin = exports.updatePuzzleAdmin = exports.createPuzzleAdmin = exports.getAllPuzzlesAdmin = exports.checkAnswer = exports.getPuzzles = void 0;
+exports.setSolverName = exports.getSolvedAnswer = exports.deleteBoardPost = exports.updateBoardPost = exports.getBoardPosts = exports.addBoardPost = exports.uploadBoardImage = exports.uploadImageAdmin = exports.setPuzzleSolvedAdmin = exports.deletePuzzlesBatchAdmin = exports.updatePuzzlesBatchAdmin = exports.deletePuzzleAdmin = exports.updatePuzzleAdmin = exports.createPuzzleAdmin = exports.getAllPuzzlesAdmin = exports.checkAnswer = exports.getPuzzles = void 0;
 /* eslint-disable max-len */
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
+const crypto_1 = require("crypto");
 // Initialize Firebase Admin SDK
 admin.initializeApp();
 const db = admin.firestore();
@@ -35,6 +36,16 @@ function extractStoragePath(value) {
         return v;
     return null;
 }
+function hashPassword(raw, salt) {
+    const s = salt || (0, crypto_1.randomBytes)(8).toString('hex');
+    const h = (0, crypto_1.createHash)('sha256').update(`${s}:${String(raw)}`).digest('hex');
+    return { salt: s, hash: h };
+}
+function validateImageContentType(ct) {
+    if (!ct)
+        return false;
+    return /^image\/(png|jpe?g|webp|gif)$/i.test(ct);
+}
 /**
  * Fetches all puzzles' public data.
  */
@@ -45,7 +56,7 @@ exports.getPuzzles = functions.https.onCall(async (_data, _context) => {
             .get();
         const puzzles = snapshot.docs.map((doc) => {
             const puzzleData = doc.data();
-            const isSolved = Boolean(puzzleData?.isSolved);
+            const isSolved = Boolean(puzzleData === null || puzzleData === void 0 ? void 0 : puzzleData.isSolved);
             const publicData = Object.assign({}, puzzleData);
             // 민감 정보는 항상 제거
             delete publicData.recoveryPhrase;
@@ -58,6 +69,7 @@ exports.getPuzzles = functions.https.onCall(async (_data, _context) => {
             }
             return publicData;
         });
+        // Sort by id ascending without requiring Firestore composite index
         puzzles.sort((a, b) => Number(a.id) - Number(b.id));
         return puzzles;
     }
@@ -84,13 +96,14 @@ exports.checkAnswer = functions.https.onCall(async (data, _context) => {
         // Validate answer first
         const isCorrect = guess.trim().toLowerCase() === String(puzzle.answer).toLowerCase();
         if (!isCorrect) {
+            // Increment global wrong attempts counter atomically
             try {
                 await doc.ref.update({ wrongAttempts: admin.firestore.FieldValue.increment(1) });
             }
             catch (incErr) {
                 functions.logger.warn('Failed to increment wrongAttempts', incErr);
             }
-            // Use failed-precondition to avoid misleading 401 in client network panel
+            // Use failed-precondition to avoid misleading 401 Unauthorized in network logs
             throw new functions.https.HttpsError("failed-precondition", "Incorrect answer. Please try again.");
         }
         // Atomically mark solved only once
@@ -114,9 +127,8 @@ exports.checkAnswer = functions.https.onCall(async (data, _context) => {
             return { type: 'image', revealImageUrl: puzzle.revealImageUrl };
         }
         if (rewardType === 'text') {
-            return { type: 'text', revealText: String(puzzle.revealText || '') };
+            return { type: 'text', revealText: puzzle.revealText || '' };
         }
-        // Fallback to image if misconfigured
         return { type: 'image', revealImageUrl: puzzle.revealImageUrl };
     }
     catch (error) {
@@ -153,7 +165,7 @@ exports.getAllPuzzlesAdmin = functions.https.onCall(async (_data, context) => {
     assertIsAdmin(context);
     try {
         const snapshot = await db.collection("puzzles").orderBy("id", "asc").get();
-        const puzzles = snapshot.docs.map((doc) => ({ docId: doc.id, ...doc.data() }));
+        const puzzles = snapshot.docs.map((doc) => (Object.assign({ docId: doc.id }, doc.data())));
         return puzzles;
     }
     catch (error) {
@@ -167,7 +179,7 @@ exports.getAllPuzzlesAdmin = functions.https.onCall(async (_data, context) => {
  * @param {functions.https.CallableContext} context - Callable context for auth/claims
  */
 exports.createPuzzleAdmin = functions.https.onCall(async (data, context) => {
-    var _a, _b;
+    var _a, _b, _c;
     assertIsAdmin(context);
     try {
         const baseRequired = ["id", "imageUrl", "rewardAmount", "answer", "rewardType"];
@@ -207,8 +219,9 @@ exports.createPuzzleAdmin = functions.https.onCall(async (data, context) => {
             id: Number(data.id),
             imageUrl: String(data.imageUrl),
             rewardAmount: String(data.rewardAmount),
-            isSolved: Boolean(data.isSolved ?? false),
-            isPublished: Boolean(data.isPublished ?? false),
+            isSolved: Boolean((_a = data.isSolved) !== null && _a !== void 0 ? _a : false),
+            isPublished: Boolean((_b = data.isPublished) !== null && _b !== void 0 ? _b : false),
+            wrongAttempts: Number((_c = data.wrongAttempts) !== null && _c !== void 0 ? _c : 0),
             answer: String(data.answer),
             rewardType,
         };
@@ -475,6 +488,163 @@ exports.uploadImageAdmin = functions.https.onCall(async (data, context) => {
     }
 });
 /**
+ * Board: Public image upload (no auth). Stores under board/ and returns public URL.
+ */
+exports.uploadBoardImage = functions.https.onCall(async (data, _context) => {
+    try {
+        const { base64, contentType } = data || {};
+        if (!base64 || !contentType || !validateImageContentType(String(contentType))) {
+            throw new functions.https.HttpsError('invalid-argument', 'Invalid image payload');
+        }
+        const bucket = getDefaultBucket();
+        const now = new Date();
+        const key = `board/${now.getFullYear()}/${now.getMonth() + 1}/${Date.now()}_${Math.random().toString(36).slice(2)}.img`;
+        const buffer = Buffer.from(String(base64), 'base64');
+        await bucket.file(key).save(buffer, { contentType: String(contentType), resumable: false, public: true, metadata: { cacheControl: 'public, max-age=31536000' } });
+        const publicUrl = `https://storage.googleapis.com/${bucket.name}/${encodeURIComponent(key)}`;
+        return { success: true, url: publicUrl, path: key };
+    }
+    catch (error) {
+        functions.logger.error('uploadBoardImage error', error);
+        if (error instanceof functions.https.HttpsError)
+            throw error;
+        throw new functions.https.HttpsError('internal', 'Failed to upload');
+    }
+});
+/**
+ * Board: Create post with password protection.
+ */
+exports.addBoardPost = functions.https.onCall(async (data, _context) => {
+    try {
+        const { title, content, password, imageUrls } = data || {};
+        const t = String(title || '').trim();
+        const c = String(content || '').trim();
+        const p = String(password || '').trim();
+        if (!t || !c || !p)
+            throw new functions.https.HttpsError('invalid-argument', 'title, content, password are required');
+        if (t.length > 80)
+            throw new functions.https.HttpsError('invalid-argument', 'title too long');
+        if (c.length > 5000)
+            throw new functions.https.HttpsError('invalid-argument', 'content too long');
+        const images = Array.isArray(imageUrls) ? imageUrls.map((u) => String(u)).slice(0, 6) : [];
+        const { salt, hash } = hashPassword(p);
+        const payload = {
+            title: t,
+            content: c,
+            imageUrls: images,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            passwordSalt: salt,
+            passwordHash: hash,
+        };
+        const ref = await db.collection('boardPosts').add(payload);
+        return { success: true, id: ref.id };
+    }
+    catch (error) {
+        functions.logger.error('addBoardPost error', error);
+        if (error instanceof functions.https.HttpsError)
+            throw error;
+        throw new functions.https.HttpsError('internal', 'Failed to add post');
+    }
+});
+/** Fetch posts (public). */
+exports.getBoardPosts = functions.https.onCall(async (data, _context) => {
+    try {
+        const { limit = 30, id } = data || {};
+        if (id) {
+            const snap = await db.collection('boardPosts').doc(String(id)).get();
+            if (!snap.exists)
+                throw new functions.https.HttpsError('not-found', 'Post not found');
+            const d = snap.data();
+            delete d.passwordHash;
+            delete d.passwordSalt;
+            return Object.assign({ id: snap.id }, d);
+        }
+        const snap = await db.collection('boardPosts').orderBy('createdAt', 'desc').limit(Number(limit)).get();
+        const items = snap.docs.map((doc) => {
+            const d = doc.data();
+            delete d.passwordHash;
+            delete d.passwordSalt;
+            return Object.assign({ id: doc.id }, d);
+        });
+        return items;
+    }
+    catch (error) {
+        functions.logger.error('getBoardPosts error', error);
+        if (error instanceof functions.https.HttpsError)
+            throw error;
+        throw new functions.https.HttpsError('internal', 'Failed to fetch posts');
+    }
+});
+/** Update post with password verification. */
+exports.updateBoardPost = functions.https.onCall(async (data, _context) => {
+    try {
+        const { id, password, title, content, imageUrls } = data || {};
+        if (!id || !password)
+            throw new functions.https.HttpsError('invalid-argument', 'id and password required');
+        const ref = db.collection('boardPosts').doc(String(id));
+        const snap = await ref.get();
+        if (!snap.exists)
+            throw new functions.https.HttpsError('not-found', 'Post not found');
+        const d = snap.data();
+        const { hash } = hashPassword(String(password), d.passwordSalt);
+        if (hash !== d.passwordHash)
+            throw new functions.https.HttpsError('permission-denied', 'Invalid password');
+        const update = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
+        if (typeof title !== 'undefined')
+            update.title = String(title).slice(0, 80);
+        if (typeof content !== 'undefined')
+            update.content = String(content).slice(0, 5000);
+        if (Array.isArray(imageUrls))
+            update.imageUrls = imageUrls.map((u) => String(u)).slice(0, 6);
+        await ref.update(update);
+        return { success: true };
+    }
+    catch (error) {
+        functions.logger.error('updateBoardPost error', error);
+        if (error instanceof functions.https.HttpsError)
+            throw error;
+        throw new functions.https.HttpsError('internal', 'Failed to update post');
+    }
+});
+/** Delete post with password verification; try deleting images. */
+exports.deleteBoardPost = functions.https.onCall(async (data, _context) => {
+    try {
+        const { id, password } = data || {};
+        if (!id || !password)
+            throw new functions.https.HttpsError('invalid-argument', 'id and password required');
+        const ref = db.collection('boardPosts').doc(String(id));
+        const snap = await ref.get();
+        if (!snap.exists)
+            throw new functions.https.HttpsError('not-found', 'Post not found');
+        const d = snap.data();
+        const { hash } = hashPassword(String(password), d.passwordSalt);
+        if (hash !== d.passwordHash)
+            throw new functions.https.HttpsError('permission-denied', 'Invalid password');
+        // delete images if in our bucket
+        try {
+            const bucket = getDefaultBucket();
+            const imgs = Array.isArray(d.imageUrls) ? d.imageUrls : [];
+            for (const u of imgs) {
+                const path = extractStoragePath(String(u));
+                if (path)
+                    await bucket.file(path).delete({ ignoreNotFound: true });
+            }
+        }
+        catch (err) {
+            functions.logger.warn('Failed to delete board images', err);
+        }
+        await ref.delete();
+        return { success: true };
+    }
+    catch (error) {
+        functions.logger.error('deleteBoardPost error', error);
+        if (error instanceof functions.https.HttpsError)
+            throw error;
+        throw new functions.https.HttpsError('internal', 'Failed to delete post');
+    }
+});
+/**
  * Returns the answer for a puzzle only if it has already been solved.
  * This allows clients to display the correct answer on solved cards
  * even if the initial listing omitted the answer field.
@@ -503,9 +673,9 @@ exports.getSolvedAnswer = functions.https.onCall(async (data, _context) => {
         throw new functions.https.HttpsError('internal', 'Failed to get answer');
     }
 });
-
 /**
  * Sets or updates the solver's display name for a puzzle.
+ * This is optional and can be moderated by admins.
  */
 exports.setSolverName = functions.https.onCall(async (data, _context) => {
     try {
@@ -517,6 +687,7 @@ exports.setSolverName = functions.https.onCall(async (data, _context) => {
         if (!trimmed) {
             throw new functions.https.HttpsError('invalid-argument', 'Name must not be empty');
         }
+        // Basic sanitation and length limit
         const sanitized = trimmed.replace(/[\r\n\t]/g, ' ').slice(0, 40);
         const snap = await db.collection('puzzles').where('id', '==', puzzleId).limit(1).get();
         if (snap.empty) {

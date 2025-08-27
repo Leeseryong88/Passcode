@@ -11,15 +11,12 @@ export async function fetchBoardPost(id: string) {
   return res?.data ?? res;
 }
 
-export async function createBoardPost(payload: { title: string; content: string; password: string; imageUrls?: string[] }) {
+export async function createBoardPost(payload: { title: string; content: string; password: string }) {
   const res: any = await (addBoardPostCallable as any)(payload);
   return res?.data ?? res;
 }
 
-export async function uploadBoardImage(base64: string, contentType: string) {
-  const res: any = await (uploadBoardImageCallable as any)({ base64, contentType });
-  return res?.data ?? res;
-}
+// image upload removed
 
 export async function updateBoardPost(payload: { id: string; password: string; title?: string; content?: string; imageUrls?: string[] }) {
   const functions = getFunctions(app, 'us-central1');
@@ -31,6 +28,20 @@ export async function updateBoardPost(payload: { id: string; password: string; t
 export async function deleteBoardPost(payload: { id: string; password: string }) {
   const functions = getFunctions(app, 'us-central1');
   const callable = httpsCallable(functions, 'deleteBoardPost');
+  const res: any = await callable(payload);
+  return res?.data ?? res;
+}
+
+export async function addBoardComment(payload: { id: string; nickname: string; content: string; password: string }) {
+  const functions = getFunctions(app, 'us-central1');
+  const callable = httpsCallable(functions, 'addBoardComment');
+  const res: any = await callable(payload);
+  return res?.data ?? res;
+}
+
+export async function deleteBoardComment(payload: { id: string; commentId: string; password: string }) {
+  const functions = getFunctions(app, 'us-central1');
+  const callable = httpsCallable(functions, 'deleteBoardComment');
   const res: any = await callable(payload);
   return res?.data ?? res;
 }

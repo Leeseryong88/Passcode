@@ -26,7 +26,7 @@ if (typeof window !== 'undefined') {
     const enableAppCheck = (import.meta as any).env?.VITE_ENABLE_APPCHECK === '1';
     if (enableAppCheck) {
       const siteKey = (import.meta as any).env?.VITE_RECAPTCHA_V3_SITE_KEY as string | undefined;
-      if (import.meta.env.DEV && !siteKey) {
+      if ((import.meta as any).env?.DEV === true && !siteKey) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
       }
@@ -43,30 +43,32 @@ if (typeof window !== 'undefined') {
 }
 
 // Functions는 즉시 초기화하되, 다른 무거운 모듈은 지연
-const functions = getFunctions(app, 'us-central1');
+export const functionsInst = getFunctions(app, 'us-central1');
+// Optional: explicitly route to regional endpoint (can help with some CORS/proxy setups)
+(functionsInst as any).customDomain = 'https://us-central1-crypto-puzzle-e089f.cloudfunctions.net';
 
 // Create callable function references. The name must match the deployed function name.
-export const getPuzzlesCallable = httpsCallable(functions, 'getPuzzles');
-export const checkAnswerCallable = httpsCallable(functions, 'checkAnswer');
-export const getSolvedAnswerCallable = httpsCallable(functions, 'getSolvedAnswer');
-export const setSolverNameCallable = httpsCallable(functions, 'setSolverName');
+export const getPuzzlesCallable = httpsCallable(functionsInst, 'getPuzzles');
+export const checkAnswerCallable = httpsCallable(functionsInst, 'checkAnswer');
+export const getSolvedAnswerCallable = httpsCallable(functionsInst, 'getSolvedAnswer');
+export const setSolverNameCallable = httpsCallable(functionsInst, 'setSolverName');
 
 // Board callables
-export const getBoardPostsCallable = httpsCallable(functions, 'getBoardPosts');
-export const addBoardPostCallable = httpsCallable(functions, 'addBoardPost');
-export const addCommentToPostCallable = httpsCallable(functions, 'addCommentToPost');
-export const uploadBoardImageCallable = httpsCallable(functions, 'uploadBoardImage');
-export const updateBoardPostCallable = httpsCallable(functions, 'updateBoardPost');
-export const deleteBoardPostCallable = httpsCallable(functions, 'deleteBoardPost');
+export const getBoardPostsCallable = httpsCallable(functionsInst, 'getBoardPosts');
+export const addBoardPostCallable = httpsCallable(functionsInst, 'addBoardPost');
+export const addCommentToPostCallable = httpsCallable(functionsInst, 'addCommentToPost');
+export const uploadBoardImageCallable = httpsCallable(functionsInst, 'uploadBoardImage');
+export const updateBoardPostCallable = httpsCallable(functionsInst, 'updateBoardPost');
+export const deleteBoardPostCallable = httpsCallable(functionsInst, 'deleteBoardPost');
 
 // Admin callables
-export const getAllPuzzlesAdminCallable = httpsCallable(functions, 'getAllPuzzlesAdmin');
-export const createPuzzleAdminCallable = httpsCallable(functions, 'createPuzzleAdmin');
-export const updatePuzzleAdminCallable = httpsCallable(functions, 'updatePuzzleAdmin');
-export const deletePuzzleAdminCallable = httpsCallable(functions, 'deletePuzzleAdmin');
-export const setPuzzleSolvedAdminCallable = httpsCallable(functions, 'setPuzzleSolvedAdmin');
+export const getAllPuzzlesAdminCallable = httpsCallable(functionsInst, 'getAllPuzzlesAdmin');
+export const createPuzzleAdminCallable = httpsCallable(functionsInst, 'createPuzzleAdmin');
+export const updatePuzzleAdminCallable = httpsCallable(functionsInst, 'updatePuzzleAdmin');
+export const deletePuzzleAdminCallable = httpsCallable(functionsInst, 'deletePuzzleAdmin');
+export const setPuzzleSolvedAdminCallable = httpsCallable(functionsInst, 'setPuzzleSolvedAdmin');
 // grantAdminRole callable removed
-export const uploadImageAdminCallable = httpsCallable(functions, 'uploadImageAdmin');
+export const uploadImageAdminCallable = httpsCallable(functionsInst, 'uploadImageAdmin');
 
 // Auth helpers
 export async function signInWithEmailPassword(email: string, password: string) {
