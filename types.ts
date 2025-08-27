@@ -11,6 +11,8 @@ export interface PrivatePuzzle {
   isPublished?: boolean;
   wrongAttempts?: number;
   solverName?: string;
+  // 새 필드: 퍼즐 유형(예: logic, cipher, image, riddle 등)
+  puzzleType?: string;
   answer: string;
   recoveryPhrase: string;
   // Reward handling

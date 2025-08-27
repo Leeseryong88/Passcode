@@ -263,6 +263,7 @@ const AdminApp: React.FC = () => {
                 <option value="image">Image</option>
                 <option value="text">Text</option>
               </select>
+              <input className="w-full px-3 py-2 bg-gray-700 rounded" placeholder="puzzleType (e.g., cipher, logic, image, riddle)" value={(newPuzzle as any).puzzleType || ''} onChange={(e) => setNewPuzzle((s: any) => ({ ...s, puzzleType: e.target.value }))} />
               {newPuzzle.rewardType === 'metamask' && (
                 <input className="w-full px-3 py-2 bg-gray-700 rounded" placeholder="walletaddress" value={newPuzzle.walletaddress} onChange={(e) => setNewPuzzle((s: any) => ({ ...s, walletaddress: e.target.value }))} />
               )}
@@ -329,6 +330,9 @@ const AdminApp: React.FC = () => {
                 </label>
                 <label className="text-xs opacity-80">Image URL
                   <input className="w-full px-3 py-2 bg-gray-700 rounded" value={editDraft.imageUrl} onChange={(e) => handleEditFieldChange('imageUrl', e.target.value)} />
+                </label>
+                <label className="text-xs opacity-80">Puzzle Type
+                  <input className="w-full px-3 py-2 bg-gray-700 rounded" value={(editDraft as any).puzzleType || ''} onChange={(e) => handleEditFieldChange('puzzleType', e.target.value)} />
                 </label>
                 <label className="text-xs opacity-80">Image Path
                   <input className="w-full px-3 py-2 bg-gray-700 rounded" value={(editDraft as any).imagePath || ''} onChange={(e) => handleEditFieldChange('imagePath', e.target.value)} />

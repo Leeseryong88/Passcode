@@ -118,11 +118,16 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
           onClick={() => setIsImageModalOpen(true)}
         />
         <div className="p-4">
-          {isSolved && (
-            <div className="flex items-center justify-end mb-3">
+          <div className="flex items-center justify-between mb-3">
+            {(puzzle as any).puzzleType && (
+              <span className="text-[10px] sm:text-xs font-semibold bg-purple-600/20 text-purple-300 px-2 py-0.5 rounded">
+                {(puzzle as any).puzzleType}
+              </span>
+            )}
+            {isSolved && (
               <span className="text-[10px] sm:text-xs font-semibold bg-yellow-600/20 text-yellow-300 px-2 py-0.5 rounded">{puzzle.rewardAmount}</span>
-            </div>
-          )}
+            )}
+          </div>
           <div className="flex justify-end mb-2">
             <span className="text-[10px] sm:text-xs font-semibold bg-red-600/20 text-red-300 px-2 py-0.5 rounded">{t('wrong_attempts_count', { count: (puzzle as any).wrongAttempts || 0 })}</span>
           </div>

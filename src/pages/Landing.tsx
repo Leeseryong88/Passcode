@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Header from '../../components/Header';
 import { useTranslation } from 'react-i18next';
-import { ArrowRight, Award, Shield, Zap } from 'lucide-react';
+import { ArrowRight, Award, Shield, TrendingUp } from 'lucide-react';
 
 const Landing: React.FC = () => {
   const { t } = useTranslation();
@@ -135,9 +135,9 @@ const Landing: React.FC = () => {
             <p className="text-gray-300 text-sm">{t('landing_feat_security_desc') || 'Clear guidance and warnings to protect your secret phrases.'}</p>
           </div>
           <div className="p-6 bg-gray-800 rounded-xl border border-gray-700">
-            <Zap className="w-8 h-8 text-emerald-400 mb-3" />
-            <h3 className="text-xl font-bold mb-2">{t('landing_feat_pace_title') || 'Fast & Smooth'}</h3>
-            <p className="text-gray-300 text-sm">{t('landing_feat_pace_desc') || 'Optimized UX with filters, skeletons, and accessible modals.'}</p>
+            <TrendingUp className="w-8 h-8 text-emerald-400 mb-3" />
+            <h3 className="text-xl font-bold mb-2">{t('landing_feat_pace_title') || 'Rising Reward Value'}</h3>
+            <p className="text-gray-300 text-sm">{t('landing_feat_pace_desc') || 'Rewards become more valuable as challenges accumulate.'}</p>
           </div>
         </section>
       </main>

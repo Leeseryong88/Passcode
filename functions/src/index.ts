@@ -223,6 +223,10 @@ export const createPuzzleAdmin = functions.https.onCall(async (data: any, contex
       rewardType,
     };
 
+    if (typeof data.puzzleType !== 'undefined' && data.puzzleType !== null) {
+      puzzleDoc.puzzleType = String(data.puzzleType).slice(0, 32);
+    }
+
     if (data.imagePath) {
       puzzleDoc.imagePath = String(data.imagePath);
     }
@@ -290,6 +294,7 @@ export const updatePuzzleAdmin = functions.https.onCall(async (data: any, contex
       "revealText",
       "wrongAttempts",
       "solverName",
+      "puzzleType",
     ];
     const updatePayload: Record<string, unknown> = {};
     for (const field of updatableFields) {
