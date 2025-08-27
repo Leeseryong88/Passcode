@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.setSolverName = exports.getSolvedAnswer = exports.deleteBoardComment = exports.addBoardComment = exports.deleteBoardPost = exports.updateBoardPost = exports.getBoardPosts = exports.addBoardPost = exports.uploadImageAdmin = exports.setPuzzleSolvedAdmin = exports.deletePuzzlesBatchAdmin = exports.updatePuzzlesBatchAdmin = exports.deletePuzzleAdmin = exports.updatePuzzleAdmin = exports.createPuzzleAdmin = exports.getAllPuzzlesAdmin = exports.checkAnswer = exports.getPuzzles = void 0;
+exports.fixCommentCounts = exports.setSolverName = exports.getSolvedAnswer = exports.deleteBoardComment = exports.addBoardComment = exports.deleteBoardPost = exports.updateBoardPost = exports.getBoardPosts = exports.addBoardPost = exports.uploadImageAdmin = exports.setPuzzleSolvedAdmin = exports.deletePuzzlesBatchAdmin = exports.updatePuzzlesBatchAdmin = exports.deletePuzzleAdmin = exports.updatePuzzleAdmin = exports.createPuzzleAdmin = exports.getAllPuzzlesAdmin = exports.checkAnswer = exports.getPuzzles = void 0;
 /* eslint-disable max-len */
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
@@ -221,6 +221,9 @@ exports.createPuzzleAdmin = functions.https.onCall(async (data, context) => {
             answer: String(data.answer),
             rewardType,
         };
+        if (typeof data.puzzleType !== 'undefined' && data.puzzleType !== null) {
+            puzzleDoc.puzzleType = String(data.puzzleType).slice(0, 32);
+        }
         if (data.imagePath) {
             puzzleDoc.imagePath = String(data.imagePath);
         }
@@ -291,6 +294,7 @@ exports.updatePuzzleAdmin = functions.https.onCall(async (data, context) => {
             "revealText",
             "wrongAttempts",
             "solverName",
+            "puzzleType",
         ];
         const updatePayload = {};
         for (const field of updatableFields) {
@@ -491,8 +495,12 @@ exports.uploadImageAdmin = functions.https.onCall(async (data, context) => {
  * Board: Create post with password protection.
  */
 exports.addBoardPost = functions.https.onCall(async (data, _context) => {
+    var _a;
     try {
         const { title, content, password } = data || {};
+        const categoryRaw = ((_a = data === null || data === void 0 ? void 0 : data.category) !== null && _a !== void 0 ? _a : '일반');
+        const allowedCategories = ['일반', '퍼즐'];
+        const category = allowedCategories.includes(categoryRaw) ? categoryRaw : '일반';
         const t = String(title || '').trim();
         const c = String(content || '').trim();
         const p = String(password || '').trim();
@@ -507,6 +515,8 @@ exports.addBoardPost = functions.https.onCall(async (data, _context) => {
             title: t,
             content: c,
             imageUrls: [],
+            category,
+            commentCount: 0,
             comments: [],
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -525,8 +535,9 @@ exports.addBoardPost = functions.https.onCall(async (data, _context) => {
 });
 /** Fetch posts (public). */
 exports.getBoardPosts = functions.https.onCall(async (data, _context) => {
+    var _a, _b, _c, _d, _e, _f, _g, _h;
     try {
-        const { limit = 30, id } = data || {};
+        const { limit = 30, id, category, startAfter } = data || {};
         if (id) {
             const snap = await db.collection('boardPosts').doc(String(id)).get();
             if (!snap.exists)
@@ -534,16 +545,34 @@ exports.getBoardPosts = functions.https.onCall(async (data, _context) => {
             const d = snap.data();
             delete d.passwordHash;
             delete d.passwordSalt;
-            return Object.assign({ id: snap.id }, d);
+            const createdAtMillis = ((_b = (_a = d.createdAt) === null || _a === void 0 ? void 0 : _a.toMillis) === null || _b === void 0 ? void 0 : _b.call(_a)) || ((_d = (_c = snap.createTime) === null || _c === void 0 ? void 0 : _c.toMillis) === null || _d === void 0 ? void 0 : _d.call(_c)) || ((_f = (_e = snap.updateTime) === null || _e === void 0 ? void 0 : _e.toMillis) === null || _f === void 0 ? void 0 : _f.call(_e));
+            const derivedLen = Array.isArray(d.comments) ? d.comments.length : 0;
+            const commentCount = Math.max(Number(d.commentCount || 0), derivedLen);
+            return Object.assign(Object.assign({ id: snap.id }, d), { commentCount, createdAtMillis });
         }
-        const snap = await db.collection('boardPosts').orderBy('createdAt', 'desc').limit(Number(limit)).get();
+        let query = db.collection('boardPosts')
+            .orderBy('createdAt', 'desc');
+        if (category) {
+            query = query.where('category', '==', String(category));
+        }
+        if (startAfter) {
+            const ts = typeof startAfter === 'number' ? admin.firestore.Timestamp.fromMillis(startAfter) : admin.firestore.Timestamp.now();
+            query = query.startAfter(ts);
+        }
+        const snap = await query.limit(Number(limit)).get();
         const items = snap.docs.map((doc) => {
+            var _a, _b, _c, _d, _e, _f;
             const d = doc.data();
             delete d.passwordHash;
             delete d.passwordSalt;
-            return { id: doc.id, title: d.title, createdAt: d.createdAt };
+            const createdAtMillis = ((_b = (_a = d.createdAt) === null || _a === void 0 ? void 0 : _a.toMillis) === null || _b === void 0 ? void 0 : _b.call(_a)) || ((_d = (_c = doc.createTime) === null || _c === void 0 ? void 0 : _c.toMillis) === null || _d === void 0 ? void 0 : _d.call(_c)) || ((_f = (_e = doc.updateTime) === null || _e === void 0 ? void 0 : _e.toMillis) === null || _f === void 0 ? void 0 : _f.call(_e));
+            const derivedLen = Array.isArray(d.comments) ? d.comments.length : 0;
+            const commentCount = Math.max(Number(d.commentCount || 0), derivedLen);
+            return { id: doc.id, title: d.title, createdAt: d.createdAt, createdAtMillis, category: d.category || '일반', commentCount, comments: d.comments || [] };
         });
-        return items;
+        const last = snap.docs[snap.docs.length - 1];
+        const nextCursor = last ? (_h = (_g = last.get('createdAt')) === null || _g === void 0 ? void 0 : _g.toMillis) === null || _h === void 0 ? void 0 : _h.call(_g) : null;
+        return { items, nextCursor };
     }
     catch (error) {
         functions.logger.error('getBoardPosts error', error);
@@ -625,18 +654,36 @@ exports.addBoardComment = functions.https.onCall(async (data, _context) => {
     try {
         const { id, nickname, content, password } = data || {};
         const ref = db.collection('boardPosts').doc(String(id));
-        const snap = await ref.get();
-        if (!snap.exists)
-            throw new functions.https.HttpsError('not-found', 'Post not found');
-        const name = String(nickname || '').trim().slice(0, 24);
-        const text = String(content || '').trim().slice(0, 1000);
-        const pw = String(password || '').trim();
-        if (!name || !text || !pw)
-            throw new functions.https.HttpsError('invalid-argument', 'nickname, content, password required');
-        const { salt, hash } = hashPassword(pw);
-        const c = { id: String(Date.now()) + Math.random().toString(36).slice(2), nickname: name, content: text, createdAt: admin.firestore.Timestamp.now(), passwordSalt: salt, passwordHash: hash };
-        await ref.update({ comments: admin.firestore.FieldValue.arrayUnion(c), updatedAt: admin.firestore.FieldValue.serverTimestamp() });
-        return { success: true };
+        const result = await db.runTransaction(async (transaction) => {
+            const snap = await transaction.get(ref);
+            if (!snap.exists)
+                throw new functions.https.HttpsError('not-found', 'Post not found');
+            const name = String(nickname || '').trim().slice(0, 24);
+            const text = String(content || '').trim().slice(0, 1000);
+            const pw = String(password || '').trim();
+            if (!name || !text || !pw)
+                throw new functions.https.HttpsError('invalid-argument', 'nickname, content, password required');
+            const { salt, hash } = hashPassword(pw);
+            const comment = {
+                id: String(Date.now()) + Math.random().toString(36).slice(2),
+                nickname: name,
+                content: text,
+                createdAt: admin.firestore.Timestamp.now(),
+                passwordSalt: salt,
+                passwordHash: hash
+            };
+            const currentData = snap.data();
+            const currentComments = Array.isArray(currentData === null || currentData === void 0 ? void 0 : currentData.comments) ? currentData.comments : [];
+            const newComments = [...currentComments, comment];
+            const newCount = newComments.length;
+            transaction.update(ref, {
+                comments: newComments,
+                commentCount: newCount,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            return { success: true };
+        });
+        return result;
     }
     catch (error) {
         functions.logger.error('addBoardComment error', error);
@@ -650,19 +697,27 @@ exports.deleteBoardComment = functions.https.onCall(async (data, _context) => {
     try {
         const { id, commentId, password } = data || {};
         const ref = db.collection('boardPosts').doc(String(id));
-        const snap = await ref.get();
-        if (!snap.exists)
-            throw new functions.https.HttpsError('not-found', 'Post not found');
-        const d = snap.data();
-        const target = (d.comments || []).find((c) => c.id === String(commentId));
-        if (!target)
-            throw new functions.https.HttpsError('not-found', 'Comment not found');
-        const { hash } = hashPassword(String(password || ''), target.passwordSalt);
-        if (hash !== target.passwordHash)
-            throw new functions.https.HttpsError('permission-denied', 'Invalid password');
-        const newComments = (d.comments || []).filter((c) => c.id !== String(commentId));
-        await ref.update({ comments: newComments, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
-        return { success: true };
+        const result = await db.runTransaction(async (transaction) => {
+            const snap = await transaction.get(ref);
+            if (!snap.exists)
+                throw new functions.https.HttpsError('not-found', 'Post not found');
+            const d = snap.data();
+            const target = (d.comments || []).find((c) => c.id === String(commentId));
+            if (!target)
+                throw new functions.https.HttpsError('not-found', 'Comment not found');
+            const { hash } = hashPassword(String(password || ''), target.passwordSalt);
+            if (hash !== target.passwordHash)
+                throw new functions.https.HttpsError('permission-denied', 'Invalid password');
+            const newComments = (d.comments || []).filter((c) => c.id !== String(commentId));
+            const newCount = newComments.length;
+            transaction.update(ref, {
+                comments: newComments,
+                commentCount: newCount,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            return { success: true };
+        });
+        return result;
     }
     catch (error) {
         functions.logger.error('deleteBoardComment error', error);
@@ -729,6 +784,33 @@ exports.setSolverName = functions.https.onCall(async (data, _context) => {
         if (error instanceof functions.https.HttpsError)
             throw error;
         throw new functions.https.HttpsError('internal', 'Failed to set solver name');
+    }
+});
+/**
+ * Fix commentCount for all board posts (one-time migration)
+ */
+exports.fixCommentCounts = functions.https.onCall(async (_data, _context) => {
+    try {
+        const snapshot = await db.collection('boardPosts').get();
+        const batch = db.batch();
+        let updated = 0;
+        snapshot.docs.forEach((doc) => {
+            const data = doc.data();
+            const commentsLength = Array.isArray(data.comments) ? data.comments.length : 0;
+            const currentCount = Number(data.commentCount || 0);
+            if (currentCount !== commentsLength) {
+                batch.update(doc.ref, { commentCount: commentsLength });
+                updated++;
+            }
+        });
+        if (updated > 0) {
+            await batch.commit();
+        }
+        return { success: true, updated };
+    }
+    catch (error) {
+        functions.logger.error('Error in fixCommentCounts:', error);
+        throw new functions.https.HttpsError('internal', 'Failed to fix comment counts');
     }
 });
 //# sourceMappingURL=index.js.map
