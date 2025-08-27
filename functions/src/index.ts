@@ -538,17 +538,19 @@ export const getBoardPosts = functions.https.onCall(async (data: any, _context) 
       const commentCount = Math.max(Number(d.commentCount || 0), derivedLen);
       return { id: snap.id, ...d, commentCount, createdAtMillis };
     }
+    // Note: Avoid composite index requirement by not combining where(category) with orderBy(createdAt).
+    // We'll filter in memory after fetching a slightly larger page.
     let query: FirebaseFirestore.Query = db.collection('boardPosts')
       .orderBy('createdAt', 'desc');
-    if (category) {
-      query = query.where('category', '==', String(category));
-    }
     if (startAfter) {
       const ts = typeof startAfter === 'number' ? admin.firestore.Timestamp.fromMillis(startAfter) : admin.firestore.Timestamp.now();
       query = query.startAfter(ts);
     }
-    const snap = await query.limit(Number(limit)).get();
-    const items = snap.docs.map((doc) => {
+    // Over-fetch when category filter is applied to compensate for client-side filtering
+    const pageLimit = Number(limit);
+    const fetchLimit = category ? Math.min(3 * pageLimit, 150) : pageLimit;
+    const snap = await query.limit(fetchLimit).get();
+    let rawItems = snap.docs.map((doc) => {
       const d = doc.data() as any;
       delete d.passwordHash; delete d.passwordSalt;
       const createdAtMillis = (d.createdAt as FirebaseFirestore.Timestamp | undefined)?.toMillis?.() || (doc.createTime as any)?.toMillis?.() || (doc.updateTime as any)?.toMillis?.();
@@ -556,6 +558,10 @@ export const getBoardPosts = functions.https.onCall(async (data: any, _context) 
       const commentCount = Math.max(Number(d.commentCount || 0), derivedLen);
       return { id: doc.id, title: d.title, createdAt: d.createdAt, createdAtMillis, category: d.category || '일반', commentCount, comments: d.comments || [] };
     });
+    if (category) {
+      rawItems = rawItems.filter((it: any) => String(it.category) === String(category));
+    }
+    const items = rawItems.slice(0, pageLimit);
     const last = snap.docs[snap.docs.length - 1];
     const nextCursor = last ? (last.get('createdAt') as FirebaseFirestore.Timestamp)?.toMillis?.() : null;
     return { items, nextCursor };

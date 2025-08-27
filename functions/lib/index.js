@@ -550,17 +550,19 @@ exports.getBoardPosts = functions.https.onCall(async (data, _context) => {
             const commentCount = Math.max(Number(d.commentCount || 0), derivedLen);
             return Object.assign(Object.assign({ id: snap.id }, d), { commentCount, createdAtMillis });
         }
+        // Note: Avoid composite index requirement by not combining where(category) with orderBy(createdAt).
+        // We'll filter in memory after fetching a slightly larger page.
         let query = db.collection('boardPosts')
             .orderBy('createdAt', 'desc');
-        if (category) {
-            query = query.where('category', '==', String(category));
-        }
         if (startAfter) {
             const ts = typeof startAfter === 'number' ? admin.firestore.Timestamp.fromMillis(startAfter) : admin.firestore.Timestamp.now();
             query = query.startAfter(ts);
         }
-        const snap = await query.limit(Number(limit)).get();
-        const items = snap.docs.map((doc) => {
+        // Over-fetch when category filter is applied to compensate for client-side filtering
+        const pageLimit = Number(limit);
+        const fetchLimit = category ? Math.min(3 * pageLimit, 150) : pageLimit;
+        const snap = await query.limit(fetchLimit).get();
+        let rawItems = snap.docs.map((doc) => {
             var _a, _b, _c, _d, _e, _f;
             const d = doc.data();
             delete d.passwordHash;
@@ -570,6 +572,10 @@ exports.getBoardPosts = functions.https.onCall(async (data, _context) => {
             const commentCount = Math.max(Number(d.commentCount || 0), derivedLen);
             return { id: doc.id, title: d.title, createdAt: d.createdAt, createdAtMillis, category: d.category || '일반', commentCount, comments: d.comments || [] };
         });
+        if (category) {
+            rawItems = rawItems.filter((it) => String(it.category) === String(category));
+        }
+        const items = rawItems.slice(0, pageLimit);
         const last = snap.docs[snap.docs.length - 1];
         const nextCursor = last ? (_h = (_g = last.get('createdAt')) === null || _g === void 0 ? void 0 : _g.toMillis) === null || _h === void 0 ? void 0 : _h.call(_g) : null;
         return { items, nextCursor };
