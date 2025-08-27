@@ -8,7 +8,15 @@ export async function fetchBoardPosts(limit = 30, category?: string, startAfter?
 
 export async function fetchBoardPost(id: string) {
   const res: any = await (getBoardPostsCallable as any)({ id });
-  return res?.data ?? res;
+  const data = res?.data ?? res;
+  // Ensure fields exist for client rendering
+  if (data) {
+    const createdAt = (data as any).createdAt;
+    const createdAtMillis = typeof (data as any).createdAtMillis === 'number' ? (data as any).createdAtMillis : (createdAt?.toMillis?.() ?? createdAt?.toDate?.()?.getTime?.());
+    const commentCount = typeof (data as any).commentCount === 'number' ? (data as any).commentCount : (((data as any).comments?.length) || 0);
+    return { ...data, createdAtMillis, commentCount };
+  }
+  return data;
 }
 
 export async function createBoardPost(payload: { title: string; content: string; password: string; category?: string }) {

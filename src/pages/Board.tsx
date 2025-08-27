@@ -20,8 +20,7 @@ const Board: React.FC = () => {
   const [content, setContent] = useState('');
   const [password, setPassword] = useState('');
   const [category, setCategory] = useState<'일반'|'퍼즐'>('일반');
-  const [nextCursor, setNextCursor] = useState<number | null>(null);
-  const [images, setImages] = useState<File[]>([]);
+  // const [nextCursor, setNextCursor] = useState<number | null>(null); // cursor 기반 페이징 미사용
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activePost, setActivePost] = useState<Post | null>(null);
@@ -30,7 +29,7 @@ const Board: React.FC = () => {
   const [commentText, setCommentText] = useState('');
   const [search, setSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const pageSize = 10;
   const getMillis = (ts: any, ms?: number): number | null => {
     if (typeof ms === 'number' && !Number.isNaN(ms)) return ms;
     if (!ts) return null;
@@ -39,8 +38,20 @@ const Board: React.FC = () => {
       if (typeof ts?.toMillis === 'function') return ts.toMillis();
       if (typeof ts?.toDate === 'function') return ts.toDate().getTime();
       if (typeof ts?.seconds === 'number') return ts.seconds * 1000;
+      if (typeof ts?._seconds === 'number') return ts._seconds * 1000;
     } catch {}
     return null;
+  };
+  const normalizePost = (p: any) => {
+    const createdAtMillis = getMillis(p?.createdAt, p?.createdAtMillis) ?? null;
+    const derivedLen = Array.isArray(p?.comments) ? p.comments.length : 0;
+    const counted = typeof p?.commentCount === 'number' ? p.commentCount : 0;
+    const commentCount = Math.max(counted, derivedLen);
+    const category = p?.category || '일반';
+    return { ...p, createdAtMillis, commentCount, category } as any;
+  };
+  const applyCommentCountToList = (postId: string, nextCount: number) => {
+    setPosts((prev) => prev.map((it) => (it.id === postId ? ({ ...it, commentCount: nextCount }) as any : it)));
   };
   const timeAgo = (ts: any, ms?: number) => {
     const m = getMillis(ts, ms);
@@ -65,8 +76,8 @@ const Board: React.FC = () => {
     try {
       const res = await fetchBoardPosts(fetchSize, category);
       const list = (res.items ?? res) as any[];
-      setPosts(list);
-      setNextCursor(res.nextCursor ?? null);
+      setPosts(list.map(normalizePost));
+      // setNextCursor(res.nextCursor ?? null);
       setError(null);
     } catch (e: any) {
       setError(e.message || 'Failed to load posts');
@@ -79,12 +90,7 @@ const Board: React.FC = () => {
 
   // image upload removed
 
-  const toBase64 = (file: File) => new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve((reader.result as string).split(',')[1] || '');
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
+  // image upload removed
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,10 +119,25 @@ const Board: React.FC = () => {
     return filtered.slice(start, start + pageSize);
   }, [filtered, currentPage, pageSize]);
 
+  const syncFromLocation = async () => {
+    const params = new URLSearchParams(window.location.search);
+    const pid = params.get('id');
+    if (pid) {
+      try {
+        const p = await fetchBoardPost(pid);
+        setActivePost(normalizePost(p));
+        setIsComposerOpen(false);
+      } catch {}
+    } else {
+      setActivePost(null);
+    }
+  };
+
   const openPost = async (id: string) => {
     try {
+      window.history.pushState({ boardId: id }, '', `/board?id=${encodeURIComponent(id)}`);
       const p = await fetchBoardPost(id);
-      setActivePost(p);
+      setActivePost(normalizePost(p));
       setIsComposerOpen(false);
     } catch (e: any) {
       alert(e.message || '불러오기 실패');
@@ -128,7 +149,9 @@ const Board: React.FC = () => {
     try {
       await addBoardComment({ id: activePost.id, nickname: commentNickname, content: commentText, password: commentPassword });
       const refreshed = await fetchBoardPost(activePost.id);
-      setActivePost(refreshed);
+      const normalized = normalizePost(refreshed);
+      setActivePost(normalized);
+      applyCommentCountToList(normalized.id, (normalized as any).commentCount ?? ((normalized as any).comments?.length || 0));
       setCommentNickname(''); setCommentPassword(''); setCommentText('');
     } catch (e: any) {
       alert(e.message || '댓글 등록 실패');
@@ -142,7 +165,9 @@ const Board: React.FC = () => {
     try {
       await deleteBoardComment({ id: activePost.id, commentId, password: pw });
       const refreshed = await fetchBoardPost(activePost.id);
-      setActivePost(refreshed);
+      const normalized = normalizePost(refreshed);
+      setActivePost(normalized);
+      applyCommentCountToList(normalized.id, (normalized as any).commentCount ?? ((normalized as any).comments?.length || 0));
     } catch (e: any) {
       alert(e.message || '댓글 삭제 실패');
     }
@@ -158,6 +183,13 @@ const Board: React.FC = () => {
       alert(e.message || '삭제 실패');
     }
   };
+
+  useEffect(() => {
+    syncFromLocation();
+    const onPop = () => { syncFromLocation(); };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100">
@@ -214,9 +246,10 @@ const Board: React.FC = () => {
                 <h3 className="text-xl font-bold">{activePost.title}</h3>
                 <button onClick={() => onDelete(activePost.id)} className="text-red-300 hover:text-red-200 px-2 py-1 rounded"><Trash2 className="w-4 h-4" /></button>
               </div>
+              <div className="mt-1 text-xs text-gray-400">{timeAgo((activePost as any).createdAt, (activePost as any).createdAtMillis)} · 댓글 {(activePost as any).commentCount ?? ((activePost as any).comments?.length || 0)}개</div>
               <p className="mt-2 text-gray-200 whitespace-pre-wrap">{activePost.content}</p>
               <div className="mt-6 p-3 bg-gray-900 rounded-lg border border-gray-700">
-                <h4 className="font-semibold mb-3">댓글</h4>
+                <h4 className="font-semibold mb-3">댓글 {(activePost as any).commentCount ?? ((activePost as any).comments?.length || 0)}</h4>
                 <div className="space-y-2 mb-4">
                   {(activePost.comments || []).map((c) => (
                     <div key={c.id} className="p-2 bg-gray-800 border border-gray-700 rounded flex justify-between">
@@ -259,7 +292,7 @@ const Board: React.FC = () => {
                 </div>
               </div>
               <div className="mt-6">
-                <button onClick={() => setActivePost(null)} className="text-sm text-gray-300 underline">목록으로</button>
+                <button onClick={() => { window.history.pushState({}, '', '/board'); setActivePost(null); }} className="text-sm text-gray-300 underline">목록으로</button>
               </div>
             </div>
           ) : (
@@ -268,10 +301,10 @@ const Board: React.FC = () => {
                 <button key={p.id} onClick={() => openPost(p.id)} className="w-full text-left p-4 bg-gray-800 border border-gray-700 rounded-xl hover:bg-gray-700">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded bg-gray-700 text-xs text-gray-300">{p.category || '일반'}</span>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded bg-gray-700 text-xs text-gray-300">{(p as any).category || '일반'}</span>
                       <div className="text-lg font-bold">{p.title}</div>
                     </div>
-                    <div className="text-xs text-gray-400">{timeAgo((p as any).createdAt, (p as any).createdAtMillis)} · 댓글 {typeof (p as any).commentCount === 'number' ? (p as any).commentCount : ((p as any).comments?.length || 0)}</div>
+                    <div className="text-xs text-gray-400">{timeAgo((p as any).createdAt, (p as any).createdAtMillis)} · 댓글 {Math.max(Number((p as any).commentCount || 0), Array.isArray((p as any).comments) ? (p as any).comments.length : 0)}개</div>
                   </div>
                 </button>
               ))}

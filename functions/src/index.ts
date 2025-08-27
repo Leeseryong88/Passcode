@@ -528,8 +528,10 @@ export const getBoardPosts = functions.https.onCall(async (data: any, _context) 
       if (!snap.exists) throw new functions.https.HttpsError('not-found', 'Post not found');
       const d = snap.data() as any;
       delete d.passwordHash; delete d.passwordSalt;
-      const createdAtMillis = (d.createdAt as FirebaseFirestore.Timestamp | undefined)?.toMillis?.();
-      return { id: snap.id, ...d, createdAtMillis };
+      const createdAtMillis = (d.createdAt as FirebaseFirestore.Timestamp | undefined)?.toMillis?.() || (snap.createTime as any)?.toMillis?.() || (snap.updateTime as any)?.toMillis?.();
+      const derivedLen = Array.isArray(d.comments) ? d.comments.length : 0;
+      const commentCount = Math.max(Number(d.commentCount || 0), derivedLen);
+      return { id: snap.id, ...d, commentCount, createdAtMillis };
     }
     let query: FirebaseFirestore.Query = db.collection('boardPosts')
       .orderBy('createdAt', 'desc');
@@ -544,8 +546,10 @@ export const getBoardPosts = functions.https.onCall(async (data: any, _context) 
     const items = snap.docs.map((doc) => {
       const d = doc.data() as any;
       delete d.passwordHash; delete d.passwordSalt;
-      const createdAtMillis = (d.createdAt as FirebaseFirestore.Timestamp | undefined)?.toMillis?.();
-      return { id: doc.id, title: d.title, createdAt: d.createdAt, createdAtMillis, category: d.category || '일반', commentCount: Number(d.commentCount || 0) };
+      const createdAtMillis = (d.createdAt as FirebaseFirestore.Timestamp | undefined)?.toMillis?.() || (doc.createTime as any)?.toMillis?.() || (doc.updateTime as any)?.toMillis?.();
+      const derivedLen = Array.isArray(d.comments) ? d.comments.length : 0;
+      const commentCount = Math.max(Number(d.commentCount || 0), derivedLen);
+      return { id: doc.id, title: d.title, createdAt: d.createdAt, createdAtMillis, category: d.category || '일반', commentCount, comments: d.comments || [] };
     });
     const last = snap.docs[snap.docs.length - 1];
     const nextCursor = last ? (last.get('createdAt') as FirebaseFirestore.Timestamp)?.toMillis?.() : null;
