@@ -489,7 +489,7 @@ export const addBoardPost = functions.https.onCall(async (data: any, _context) =
   try {
     const { title, content, password } = data || {};
     const categoryRaw = (data?.category ?? '일반') as string;
-    const allowedCategories = ['일반','공지','질문'];
+    const allowedCategories = ['일반','퍼즐'];
     const category = allowedCategories.includes(categoryRaw) ? categoryRaw : '일반';
     const t = String(title || '').trim();
     const c = String(content || '').trim();
@@ -522,21 +522,34 @@ export const addBoardPost = functions.https.onCall(async (data: any, _context) =
 /** Fetch posts (public). */
 export const getBoardPosts = functions.https.onCall(async (data: any, _context) => {
   try {
-    const { limit = 30, id } = data || {};
+    const { limit = 30, id, category, startAfter } = data || {};
     if (id) {
       const snap = await db.collection('boardPosts').doc(String(id)).get();
       if (!snap.exists) throw new functions.https.HttpsError('not-found', 'Post not found');
       const d = snap.data() as any;
       delete d.passwordHash; delete d.passwordSalt;
-      return { id: snap.id, ...d };
+      const createdAtMillis = (d.createdAt as FirebaseFirestore.Timestamp | undefined)?.toMillis?.();
+      return { id: snap.id, ...d, createdAtMillis };
     }
-    const snap = await db.collection('boardPosts').orderBy('createdAt', 'desc').limit(Number(limit)).get();
+    let query: FirebaseFirestore.Query = db.collection('boardPosts')
+      .orderBy('createdAt', 'desc');
+    if (category) {
+      query = query.where('category', '==', String(category));
+    }
+    if (startAfter) {
+      const ts = typeof startAfter === 'number' ? admin.firestore.Timestamp.fromMillis(startAfter) : admin.firestore.Timestamp.now();
+      query = query.startAfter(ts);
+    }
+    const snap = await query.limit(Number(limit)).get();
     const items = snap.docs.map((doc) => {
       const d = doc.data() as any;
       delete d.passwordHash; delete d.passwordSalt;
-      return { id: doc.id, title: d.title, createdAt: d.createdAt, category: d.category || '일반', commentCount: Number(d.commentCount || 0) };
+      const createdAtMillis = (d.createdAt as FirebaseFirestore.Timestamp | undefined)?.toMillis?.();
+      return { id: doc.id, title: d.title, createdAt: d.createdAt, createdAtMillis, category: d.category || '일반', commentCount: Number(d.commentCount || 0) };
     });
-    return items;
+    const last = snap.docs[snap.docs.length - 1];
+    const nextCursor = last ? (last.get('createdAt') as FirebaseFirestore.Timestamp)?.toMillis?.() : null;
+    return { items, nextCursor };
   } catch (error) {
     functions.logger.error('getBoardPosts error', error);
     if (error instanceof functions.https.HttpsError) throw error;

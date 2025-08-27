@@ -1,8 +1,8 @@
 import { app, getBoardPostsCallable, addBoardPostCallable, uploadBoardImageCallable } from '../firebase';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 
-export async function fetchBoardPosts(limit = 30, category?: string) {
-  const res: any = await (getBoardPostsCallable as any)({ limit, category });
+export async function fetchBoardPosts(limit = 30, category?: string, startAfter?: number) {
+  const res: any = await (getBoardPostsCallable as any)({ limit, category, startAfter });
   return res?.data ?? res;
 }
 

@@ -14,6 +14,9 @@ const SelectedApp = React.lazy(() => {
   if (route.startsWith('/admin')) {
     return import('./admin/AdminApp');
   }
+  if (route.startsWith('/board/new')) {
+    return import('./src/pages/BoardNew');
+  }
   if (route === '/') {
     return import('./src/pages/Landing');
   }
