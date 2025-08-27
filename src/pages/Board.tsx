@@ -12,6 +12,20 @@ type Post = {
   updatedAt?: any;
 };
 
+const PostListItem = React.memo(function PostListItem({ p, timeAgo, onOpen }: { p: any; timeAgo: (ts: any, ms?: number) => string; onOpen: (id: string) => void }) {
+  return (
+    <button onClick={() => onOpen(p.id)} className="w-full text-left p-4 bg-gray-800 border border-gray-700 rounded-xl hover:bg-gray-700">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center px-2 py-0.5 rounded bg-gray-700 text-xs text-gray-300">{(p as any).category || '일반'}</span>
+          <div className="text-lg font-bold">{p.title}</div>
+        </div>
+        <div className="text-xs text-gray-400">{timeAgo((p as any).createdAt, (p as any).createdAtMillis)} · 댓글 {Math.max(Number((p as any).commentCount || 0), Array.isArray((p as any).comments) ? (p as any).comments.length : 0)}개</div>
+      </div>
+    </button>
+  );
+});
+
 const Board: React.FC = () => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -28,8 +42,8 @@ const Board: React.FC = () => {
   const [commentPassword, setCommentPassword] = useState('');
   const [commentText, setCommentText] = useState('');
   const [search, setSearch] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
+  const [nextCursor, setNextCursor] = useState<number | null>(null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const getMillis = (ts: any, ms?: number): number | null => {
     if (typeof ms === 'number' && !Number.isNaN(ms)) return ms;
     if (!ts) return null;
@@ -70,23 +84,36 @@ const Board: React.FC = () => {
     return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
   };
 
-  const [fetchSize] = useState(200);
-  const load = async () => {
-    setIsLoading(true);
+  const [fetchSize] = useState(20);
+  const load = async (opts: { append?: boolean } = {}) => {
+    const { append = false } = opts;
+    if (append) setIsLoadingMore(true); else setIsLoading(true);
     try {
-      const res = await fetchBoardPosts(fetchSize, category);
+      const res = await fetchBoardPosts(fetchSize, category, append ? nextCursor ?? undefined : undefined);
       const list = (res.items ?? res) as any[];
-      setPosts(list.map(normalizePost));
-      // setNextCursor(res.nextCursor ?? null);
+      const normalizedList = list.map(normalizePost);
+      setPosts((prev) => append ? [...prev, ...normalizedList] : normalizedList);
+      setNextCursor(res.nextCursor ?? null);
       setError(null);
+      // 댓글 카운트가 0으로 오는 아이템을 상세 조회로 보정 (최대 8개)
+      const targets = normalizedList.filter((p: any) => Number(p?.commentCount || 0) === 0).slice(0, 8);
+      targets.forEach(async (p: any) => {
+        try {
+          const detail = await fetchBoardPost(p.id);
+          const fixed = normalizePost(detail);
+          applyCommentCountToList(p.id, (fixed as any).commentCount ?? ((fixed as any).comments?.length || 0));
+        } catch {}
+      });
     } catch (e: any) {
       setError(e.message || 'Failed to load posts');
     } finally {
-      setIsLoading(false);
+      if (append) setIsLoadingMore(false); else setIsLoading(false);
     }
   };
 
   useEffect(() => { load(); }, []);
+  // 카테고리 변경 시 자동 새로고침
+  useEffect(() => { setNextCursor(null); setPosts([]); load(); }, [category]);
 
   // image upload removed
 
@@ -113,11 +140,6 @@ const Board: React.FC = () => {
     return posts.filter((p) => `${p.title} ${(p.content||'')}`.toLowerCase().includes(q));
   }, [posts, search]);
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const pagedPosts = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filtered.slice(start, start + pageSize);
-  }, [filtered, currentPage, pageSize]);
 
   const syncFromLocation = async () => {
     const params = new URLSearchParams(window.location.search);
@@ -184,6 +206,8 @@ const Board: React.FC = () => {
     }
   };
 
+
+
   useEffect(() => {
     syncFromLocation();
     const onPop = () => { syncFromLocation(); };
@@ -200,11 +224,11 @@ const Board: React.FC = () => {
         </div>
         <div className="mb-4 flex items-center justify-end gap-2">
           <label className="text-sm text-gray-300">분류</label>
-          <select value={category} onChange={(e) => { setCategory(e.target.value as any); setCurrentPage(1); }} className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm">
+          <select value={category} onChange={(e) => { setCategory(e.target.value as any); }} className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm">
             <option>일반</option>
             <option>퍼즐</option>
           </select>
-          <button onClick={() => { setCurrentPage(1); load(); }} className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-white text-sm">필터 적용</button>
+          <button onClick={() => { setNextCursor(null); load(); }} className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-white text-sm">필터 적용</button>
         </div>
         {isComposerOpen && (
         <form onSubmit={onSubmit} className="mb-10 p-4 bg-gray-800 border border-gray-700 rounded-xl space-y-3">
@@ -231,7 +255,7 @@ const Board: React.FC = () => {
 
         {isLoading ? (
           <div className="space-y-2">
-            {Array.from({ length: 6 }).map((_, i) => (
+            {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="animate-pulse p-4 bg-gray-800/60 border border-gray-700/60 rounded-xl">
                 <div className="h-5 w-1/3 bg-gray-700 rounded" />
               </div>
@@ -297,35 +321,35 @@ const Board: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-2">
-              {pagedPosts.map((p) => (
-                <button key={p.id} onClick={() => openPost(p.id)} className="w-full text-left p-4 bg-gray-800 border border-gray-700 rounded-xl hover:bg-gray-700">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded bg-gray-700 text-xs text-gray-300">{(p as any).category || '일반'}</span>
-                      <div className="text-lg font-bold">{p.title}</div>
-                    </div>
-                    <div className="text-xs text-gray-400">{timeAgo((p as any).createdAt, (p as any).createdAtMillis)} · 댓글 {Math.max(Number((p as any).commentCount || 0), Array.isArray((p as any).comments) ? (p as any).comments.length : 0)}개</div>
-                  </div>
-                </button>
-              ))}
-              {/* 검색(좌) · 페이지네이션(중앙) · 글쓰기(우) */}
+              {filtered.length === 0 ? (
+                <div className="p-6 text-center text-gray-300 bg-gray-800/60 border border-gray-700/60 rounded-xl">
+                  게시글이 없습니다. 첫 글을 작성해보세요.
+                </div>
+              ) : (
+                filtered.map((p) => (
+                  <PostListItem key={p.id} p={p as any} timeAgo={timeAgo} onOpen={openPost} />
+                ))
+              )}
+              {/* 검색(좌) · 더 보기(중앙) · 글쓰기(우) */}
               <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
                 {/* Left: search */}
                 <div className="order-1 sm:order-1">
-                  <input value={search} onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }} placeholder="제목+내용 검색" className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded" />
+                  <input value={search} onChange={(e) => { setSearch(e.target.value); }} placeholder="제목+내용 검색" className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded" />
+                  {search.trim() && (
+                    <div className="mt-1 text-xs text-gray-400">검색 결과 {filtered.length}개</div>
+                  )}
                 </div>
-                {/* Center: pagination */}
+                {/* Center: load more */}
                 <div className="order-3 sm:order-2 flex justify-center">
-                  <div className="flex items-center gap-1 flex-wrap justify-center">
-                    <button disabled={currentPage<=1} onClick={() => setCurrentPage((p)=>Math.max(1,p-1))} className="px-2 py-1 text-sm bg-gray-800 border border-gray-700 rounded text-white disabled:opacity-40">이전</button>
-                    {Array.from({ length: pageCount }).slice(0, 20).map((_, i) => {
-                      const n = i + 1;
-                      return (
-                        <button key={n} onClick={() => setCurrentPage(n)} className={`px-2 py-1 text-sm rounded border ${currentPage===n? 'bg-cyan-600 border-cyan-500 text-white':'bg-gray-800 border-gray-700 text-gray-200'}`}>{n}</button>
-                      );
-                    })}
-                    <button disabled={currentPage>=pageCount} onClick={() => setCurrentPage((p)=>Math.min(pageCount,p+1))} className="px-2 py-1 text-sm bg-gray-800 border border-gray-700 rounded text-white disabled:opacity-40">다음</button>
-                  </div>
+                  {search.trim() ? (
+                    <div className="text-sm text-gray-400">검색 중에는 더 보기를 사용할 수 없습니다</div>
+                  ) : isLoadingMore ? (
+                    <div className="text-sm text-gray-300">로딩 중…</div>
+                  ) : nextCursor ? (
+                    <button onClick={() => load({ append: true })} className="px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded text-white hover:bg-gray-700">더 보기</button>
+                  ) : (
+                    <div className="text-sm text-gray-400">더 이상 글이 없습니다</div>
+                  )}
                 </div>
                 {/* Right: write button */}
                 <div className="order-2 sm:order-3 flex justify-end">

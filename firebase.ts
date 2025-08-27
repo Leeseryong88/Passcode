@@ -60,6 +60,7 @@ export const addCommentToPostCallable = httpsCallable(functionsInst, 'addComment
 export const uploadBoardImageCallable = httpsCallable(functionsInst, 'uploadBoardImage');
 export const updateBoardPostCallable = httpsCallable(functionsInst, 'updateBoardPost');
 export const deleteBoardPostCallable = httpsCallable(functionsInst, 'deleteBoardPost');
+export const fixCommentCountsCallable = httpsCallable(functionsInst, 'fixCommentCounts');
 
 // Admin callables
 export const getAllPuzzlesAdminCallable = httpsCallable(functionsInst, 'getAllPuzzlesAdmin');

@@ -621,16 +621,41 @@ export const addBoardComment = functions.https.onCall(async (data: any, _context
   try {
     const { id, nickname, content, password } = data || {};
     const ref = db.collection('boardPosts').doc(String(id));
-    const snap = await ref.get();
-    if (!snap.exists) throw new functions.https.HttpsError('not-found', 'Post not found');
-    const name = String(nickname || '').trim().slice(0, 24);
-    const text = String(content || '').trim().slice(0, 1000);
-    const pw = String(password || '').trim();
-    if (!name || !text || !pw) throw new functions.https.HttpsError('invalid-argument', 'nickname, content, password required');
-    const { salt, hash } = hashPassword(pw);
-    const c = { id: String(Date.now()) + Math.random().toString(36).slice(2), nickname: name, content: text, createdAt: admin.firestore.Timestamp.now(), passwordSalt: salt, passwordHash: hash };
-    await ref.update({ comments: admin.firestore.FieldValue.arrayUnion(c), commentCount: admin.firestore.FieldValue.increment(1), updatedAt: admin.firestore.FieldValue.serverTimestamp() });
-    return { success: true };
+    
+    const result = await db.runTransaction(async (transaction) => {
+      const snap = await transaction.get(ref);
+      if (!snap.exists) throw new functions.https.HttpsError('not-found', 'Post not found');
+      
+      const name = String(nickname || '').trim().slice(0, 24);
+      const text = String(content || '').trim().slice(0, 1000);
+      const pw = String(password || '').trim();
+      if (!name || !text || !pw) throw new functions.https.HttpsError('invalid-argument', 'nickname, content, password required');
+      
+      const { salt, hash } = hashPassword(pw);
+      const comment = { 
+        id: String(Date.now()) + Math.random().toString(36).slice(2), 
+        nickname: name, 
+        content: text, 
+        createdAt: admin.firestore.Timestamp.now(), 
+        passwordSalt: salt, 
+        passwordHash: hash 
+      };
+      
+      const currentData = snap.data() as any;
+      const currentComments = Array.isArray(currentData?.comments) ? currentData.comments : [];
+      const newComments = [...currentComments, comment];
+      const newCount = newComments.length;
+      
+      transaction.update(ref, { 
+        comments: newComments, 
+        commentCount: newCount,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp() 
+      });
+      
+      return { success: true };
+    });
+    
+    return result;
   } catch (error) {
     functions.logger.error('addBoardComment error', error);
     if (error instanceof functions.https.HttpsError) throw error;
@@ -643,16 +668,31 @@ export const deleteBoardComment = functions.https.onCall(async (data: any, _cont
   try {
     const { id, commentId, password } = data || {};
     const ref = db.collection('boardPosts').doc(String(id));
-    const snap = await ref.get();
-    if (!snap.exists) throw new functions.https.HttpsError('not-found', 'Post not found');
-    const d = snap.data() as any;
-    const target = (d.comments || []).find((c: any) => c.id === String(commentId));
-    if (!target) throw new functions.https.HttpsError('not-found', 'Comment not found');
-    const { hash } = hashPassword(String(password || ''), target.passwordSalt);
-    if (hash !== target.passwordHash) throw new functions.https.HttpsError('permission-denied', 'Invalid password');
-    const newComments = (d.comments || []).filter((c: any) => c.id !== String(commentId));
-    await ref.update({ comments: newComments, commentCount: admin.firestore.FieldValue.increment(-1), updatedAt: admin.firestore.FieldValue.serverTimestamp() });
-    return { success: true };
+    
+    const result = await db.runTransaction(async (transaction) => {
+      const snap = await transaction.get(ref);
+      if (!snap.exists) throw new functions.https.HttpsError('not-found', 'Post not found');
+      
+      const d = snap.data() as any;
+      const target = (d.comments || []).find((c: any) => c.id === String(commentId));
+      if (!target) throw new functions.https.HttpsError('not-found', 'Comment not found');
+      
+      const { hash } = hashPassword(String(password || ''), target.passwordSalt);
+      if (hash !== target.passwordHash) throw new functions.https.HttpsError('permission-denied', 'Invalid password');
+      
+      const newComments = (d.comments || []).filter((c: any) => c.id !== String(commentId));
+      const newCount = newComments.length;
+      
+      transaction.update(ref, { 
+        comments: newComments, 
+        commentCount: newCount,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp() 
+      });
+      
+      return { success: true };
+    });
+    
+    return result;
   } catch (error) {
     functions.logger.error('deleteBoardComment error', error);
     if (error instanceof functions.https.HttpsError) throw error;
@@ -714,5 +754,36 @@ export const setSolverName = functions.https.onCall(async (data: any, _context) 
     functions.logger.error('Error in setSolverName:', error);
     if (error instanceof functions.https.HttpsError) throw error;
     throw new functions.https.HttpsError('internal', 'Failed to set solver name');
+  }
+});
+
+/**
+ * Fix commentCount for all board posts (one-time migration)
+ */
+export const fixCommentCounts = functions.https.onCall(async (_data, _context) => {
+  try {
+    const snapshot = await db.collection('boardPosts').get();
+    const batch = db.batch();
+    let updated = 0;
+    
+    snapshot.docs.forEach((doc) => {
+      const data = doc.data();
+      const commentsLength = Array.isArray(data.comments) ? data.comments.length : 0;
+      const currentCount = Number(data.commentCount || 0);
+      
+      if (currentCount !== commentsLength) {
+        batch.update(doc.ref, { commentCount: commentsLength });
+        updated++;
+      }
+    });
+    
+    if (updated > 0) {
+      await batch.commit();
+    }
+    
+    return { success: true, updated };
+  } catch (error) {
+    functions.logger.error('Error in fixCommentCounts:', error);
+    throw new functions.https.HttpsError('internal', 'Failed to fix comment counts');
   }
 });
