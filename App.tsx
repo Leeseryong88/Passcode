@@ -105,7 +105,7 @@ const App: React.FC = () => {
         />
         
         {isLoading && (
-          <div className="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
             {Array.from({ length: 8 }).map((_, idx) => (
               <div key={idx} className="animate-pulse bg-gray-800 border border-gray-700 rounded-xl overflow-hidden">
                 <div className="h-36 sm:h-40 bg-gray-700" />
@@ -126,7 +126,7 @@ const App: React.FC = () => {
 
           {!isLoading && !error && (
             filteredPuzzles.length > 0 ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
                 {filteredPuzzles.map((puzzle) => (
                   <PuzzleCard 
                     key={puzzle.id} 
