@@ -1,8 +1,8 @@
 import { app, getBoardPostsCallable, addBoardPostCallable, uploadBoardImageCallable } from '../firebase';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 
-export async function fetchBoardPosts(limit = 30) {
-  const res: any = await (getBoardPostsCallable as any)({ limit });
+export async function fetchBoardPosts(limit = 30, category?: string) {
+  const res: any = await (getBoardPostsCallable as any)({ limit, category });
   return res?.data ?? res;
 }
 
@@ -11,7 +11,7 @@ export async function fetchBoardPost(id: string) {
   return res?.data ?? res;
 }
 
-export async function createBoardPost(payload: { title: string; content: string; password: string }) {
+export async function createBoardPost(payload: { title: string; content: string; password: string; category?: string }) {
   const res: any = await (addBoardPostCallable as any)(payload);
   return res?.data ?? res;
 }

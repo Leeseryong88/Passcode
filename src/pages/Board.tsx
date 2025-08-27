@@ -19,6 +19,7 @@ const Board: React.FC = () => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [password, setPassword] = useState('');
+  const [category, setCategory] = useState<'일반'|'공지'|'질문'>('일반');
   const [images, setImages] = useState<File[]>([]);
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -26,11 +27,20 @@ const Board: React.FC = () => {
   const [commentNickname, setCommentNickname] = useState('');
   const [commentPassword, setCommentPassword] = useState('');
   const [commentText, setCommentText] = useState('');
+  const formatDate = (ts: any) => {
+    try {
+      if (!ts) return '';
+      const d = (ts?.toDate ? ts.toDate() : new Date(ts.seconds ? ts.seconds * 1000 : ts)) as Date;
+      const pad = (n: number) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    } catch { return ''; }
+  };
 
+  const [pageSize] = useState(20);
   const load = async () => {
     setIsLoading(true);
     try {
-      const list = await fetchBoardPosts(50);
+      const list = await fetchBoardPosts(pageSize, category);
       setPosts(list);
       setError(null);
     } catch (e: any) {
@@ -56,7 +66,7 @@ const Board: React.FC = () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      await createBoardPost({ title, content, password });
+      await createBoardPost({ title, content, password, category });
       setTitle(''); setContent(''); setPassword('');
       await load();
     } catch (e: any) {
@@ -118,12 +128,28 @@ const Board: React.FC = () => {
       <main className="container mx-auto px-4 py-10">
         <div className="mb-6 flex items-center justify-between">
           <h1 className="text-2xl font-bold">게시판</h1>
+          <div className="flex items-center gap-2">
+            <select value={category} onChange={(e) => { setCategory(e.target.value as any); }} className="px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm">
+              <option>일반</option>
+              <option>공지</option>
+              <option>질문</option>
+            </select>
+            <button onClick={load} className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-white text-sm">필터 적용</button>
+          </div>
           <button onClick={() => setIsComposerOpen((v) => !v)} className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 rounded-lg text-white font-semibold">
             {isComposerOpen ? '닫기' : '글쓰기'}
           </button>
         </div>
         {isComposerOpen && (
         <form onSubmit={onSubmit} className="mb-10 p-4 bg-gray-800 border border-gray-700 rounded-xl space-y-3">
+          <div>
+            <label className="mr-2 text-sm text-gray-300">분류</label>
+            <select value={category} onChange={(e) => setCategory(e.target.value as any)} className="px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm">
+              <option>일반</option>
+              <option>공지</option>
+              <option>질문</option>
+            </select>
+          </div>
           <div className="grid md:grid-cols-2 gap-3">
             <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="제목" className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-cyan-500" />
             <div className="flex items-center gap-2">
@@ -139,7 +165,13 @@ const Board: React.FC = () => {
         )}
 
         {isLoading ? (
-          <div className="text-center text-gray-400">로딩 중…</div>
+          <div className="space-y-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="animate-pulse p-4 bg-gray-800/60 border border-gray-700/60 rounded-xl">
+                <div className="h-5 w-1/3 bg-gray-700 rounded" />
+              </div>
+            ))}
+          </div>
         ) : error ? (
           <div className="text-center text-red-400">{error}</div>
         ) : (
@@ -152,13 +184,7 @@ const Board: React.FC = () => {
               <p className="mt-2 text-gray-200 whitespace-pre-wrap">{activePost.content}</p>
               <div className="mt-6 p-3 bg-gray-900 rounded-lg border border-gray-700">
                 <h4 className="font-semibold mb-3">댓글</h4>
-                <div className="grid sm:grid-cols-3 gap-2 mb-3">
-                  <input value={commentNickname} onChange={(e) => setCommentNickname(e.target.value)} placeholder="닉네임" className="px-3 py-2 bg-gray-700 border border-gray-600 rounded" />
-                  <input value={commentPassword} onChange={(e) => setCommentPassword(e.target.value)} placeholder="비밀번호" className="px-3 py-2 bg-gray-700 border border-gray-600 rounded" />
-                  <button onClick={submitComment} className="bg-cyan-600 hover:bg-cyan-700 text-white font-semibold px-3 rounded">등록</button>
-                </div>
-                <textarea value={commentText} onChange={(e) => setCommentText(e.target.value)} placeholder="내용" rows={3} className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded mb-3" />
-                <div className="space-y-2">
+                <div className="space-y-2 mb-4">
                   {(activePost.comments || []).map((c) => (
                     <div key={c.id} className="p-2 bg-gray-800 border border-gray-700 rounded flex justify-between">
                       <div>
@@ -169,6 +195,14 @@ const Board: React.FC = () => {
                     </div>
                   ))}
                 </div>
+                <div className="border-t border-gray-700 pt-3">
+                  <div className="grid sm:grid-cols-3 gap-2 mb-3">
+                    <input value={commentNickname} onChange={(e) => setCommentNickname(e.target.value)} placeholder="닉네임" className="px-3 py-2 bg-gray-700 border border-gray-600 rounded" />
+                    <input value={commentPassword} onChange={(e) => setCommentPassword(e.target.value)} placeholder="비밀번호" className="px-3 py-2 bg-gray-700 border border-gray-600 rounded" />
+                    <button onClick={submitComment} className="bg-cyan-600 hover:bg-cyan-700 text-white font-semibold px-3 rounded">등록</button>
+                  </div>
+                  <textarea value={commentText} onChange={(e) => setCommentText(e.target.value)} placeholder="내용" rows={3} className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded" />
+                </div>
               </div>
               <div className="mt-6">
                 <button onClick={() => setActivePost(null)} className="text-sm text-gray-300 underline">목록으로</button>
@@ -178,7 +212,10 @@ const Board: React.FC = () => {
             <div className="space-y-2">
               {posts.map((p) => (
                 <button key={p.id} onClick={() => openPost(p.id)} className="w-full text-left p-4 bg-gray-800 border border-gray-700 rounded-xl hover:bg-gray-700">
-                  <div className="text-lg font-bold">{p.title}</div>
+                  <div className="flex items-center justify-between">
+                    <div className="text-lg font-bold">{p.title}</div>
+                    <div className="text-xs text-gray-400">{formatDate(p.createdAt)}</div>
+                  </div>
                 </button>
               ))}
             </div>

@@ -37,10 +37,7 @@ function hashPassword(raw: string, salt?: string) {
   return { salt: s, hash: h };
 }
 
-function validateImageContentType(ct?: string) {
-  if (!ct) return false;
-  return /^image\/(png|jpe?g|webp|gif)$/i.test(ct);
-}
+// function validateImageContentType removed (no longer used)
 
 /**
  * Fetches all puzzles' public data.
@@ -491,6 +488,9 @@ export const uploadImageAdmin = functions.https.onCall(async (data: any, context
 export const addBoardPost = functions.https.onCall(async (data: any, _context) => {
   try {
     const { title, content, password } = data || {};
+    const categoryRaw = (data?.category ?? '일반') as string;
+    const allowedCategories = ['일반','공지','질문'];
+    const category = allowedCategories.includes(categoryRaw) ? categoryRaw : '일반';
     const t = String(title || '').trim();
     const c = String(content || '').trim();
     const p = String(password || '').trim();
@@ -502,6 +502,8 @@ export const addBoardPost = functions.https.onCall(async (data: any, _context) =
       title: t,
       content: c,
       imageUrls: [],
+      category,
+      commentCount: 0,
       comments: [],
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -532,7 +534,7 @@ export const getBoardPosts = functions.https.onCall(async (data: any, _context) 
     const items = snap.docs.map((doc) => {
       const d = doc.data() as any;
       delete d.passwordHash; delete d.passwordSalt;
-      return { id: doc.id, title: d.title, createdAt: d.createdAt };
+      return { id: doc.id, title: d.title, createdAt: d.createdAt, category: d.category || '일반', commentCount: Number(d.commentCount || 0) };
     });
     return items;
   } catch (error) {
@@ -609,8 +611,8 @@ export const addBoardComment = functions.https.onCall(async (data: any, _context
     const pw = String(password || '').trim();
     if (!name || !text || !pw) throw new functions.https.HttpsError('invalid-argument', 'nickname, content, password required');
     const { salt, hash } = hashPassword(pw);
-    const c = { id: String(Date.now()) + Math.random().toString(36).slice(2), nickname: name, content: text, createdAt: admin.firestore.FieldValue.serverTimestamp(), passwordSalt: salt, passwordHash: hash };
-    await ref.update({ comments: admin.firestore.FieldValue.arrayUnion(c), updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+    const c = { id: String(Date.now()) + Math.random().toString(36).slice(2), nickname: name, content: text, createdAt: admin.firestore.Timestamp.now(), passwordSalt: salt, passwordHash: hash };
+    await ref.update({ comments: admin.firestore.FieldValue.arrayUnion(c), commentCount: admin.firestore.FieldValue.increment(1), updatedAt: admin.firestore.FieldValue.serverTimestamp() });
     return { success: true };
   } catch (error) {
     functions.logger.error('addBoardComment error', error);
@@ -632,7 +634,7 @@ export const deleteBoardComment = functions.https.onCall(async (data: any, _cont
     const { hash } = hashPassword(String(password || ''), target.passwordSalt);
     if (hash !== target.passwordHash) throw new functions.https.HttpsError('permission-denied', 'Invalid password');
     const newComments = (d.comments || []).filter((c: any) => c.id !== String(commentId));
-    await ref.update({ comments: newComments, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+    await ref.update({ comments: newComments, commentCount: admin.firestore.FieldValue.increment(-1), updatedAt: admin.firestore.FieldValue.serverTimestamp() });
     return { success: true };
   } catch (error) {
     functions.logger.error('deleteBoardComment error', error);
