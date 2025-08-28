@@ -1,4 +1,4 @@
-import { app, getBoardPostsCallable, addBoardPostCallable, uploadBoardImageCallable } from '../firebase';
+import { app, getBoardPostsCallable, addBoardPostCallable, uploadBoardImageCallable, getBoardPostsAdminCallable, updateBoardPostAdminCallable, deleteBoardPostAdminCallable, verifyBoardPostPasswordCallable } from '../firebase';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 
 export async function fetchBoardPosts(limit = 30, category?: string, startAfter?: number) {
@@ -51,6 +51,27 @@ export async function deleteBoardComment(payload: { id: string; commentId: strin
   const functions = getFunctions(app, 'us-central1');
   const callable = httpsCallable(functions, 'deleteBoardComment');
   const res: any = await callable(payload);
+  return res?.data ?? res;
+}
+
+export async function verifyBoardPostPassword(payload: { id: string; password: string }) {
+  const res: any = await (verifyBoardPostPasswordCallable as any)(payload);
+  return res?.data ?? res;
+}
+
+// Admin-only board APIs
+export async function adminFetchBoardPosts(limit = 50, category?: string) {
+  const res: any = await (getBoardPostsAdminCallable as any)({ limit, category });
+  return res?.data ?? res;
+}
+
+export async function adminUpdateBoardPost(payload: { id: string; title?: string; content?: string; category?: string; imageUrls?: string[]; isPinned?: boolean; }) {
+  const res: any = await (updateBoardPostAdminCallable as any)(payload);
+  return res?.data ?? res;
+}
+
+export async function adminDeleteBoardPost(id: string) {
+  const res: any = await (deleteBoardPostAdminCallable as any)({ id });
   return res?.data ?? res;
 }
 

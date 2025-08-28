@@ -37,6 +37,34 @@ function hashPassword(raw: string, salt?: string) {
   return { salt: s, hash: h };
 }
 
+function extractClientIp(req: any): string | null {
+  try {
+    const xfwd = req?.headers?.['x-forwarded-for'];
+    if (typeof xfwd === 'string' && xfwd.length > 0) {
+      return xfwd.split(',')[0].trim();
+    }
+    const ip = (req?.ip || req?.connection?.remoteAddress || req?.socket?.remoteAddress);
+    return ip ? String(ip) : null;
+  } catch {
+    return null;
+  }
+}
+
+function maskIpForDisplay(ip: string | null): string | undefined {
+  if (!ip) return undefined;
+  const v = String(ip);
+  if (v.includes(':')) {
+    const parts = v.split(':');
+    const head = parts.slice(0, 2).join(':');
+    return `${head}::****`;
+  }
+  const parts = v.split('.');
+  if (parts.length === 4) {
+    return `${parts[0]}.${parts[1]}.${parts[2]}.*`;
+  }
+  return undefined;
+}
+
 // function validateImageContentType removed (no longer used)
 
 /**
@@ -514,6 +542,7 @@ export const addBoardPost = functions.https.onCall(async (data: any, _context) =
       category,
       commentCount: 0,
       comments: [],
+      isPinned: false,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       passwordSalt: salt,
@@ -560,12 +589,32 @@ export const getBoardPosts = functions.https.onCall(async (data: any, _context) 
       const createdAtMillis = (d.createdAt as FirebaseFirestore.Timestamp | undefined)?.toMillis?.() || (doc.createTime as any)?.toMillis?.() || (doc.updateTime as any)?.toMillis?.();
       const derivedLen = Array.isArray(d.comments) ? d.comments.length : 0;
       const commentCount = Math.max(Number(d.commentCount || 0), derivedLen);
-      return { id: doc.id, title: d.title, createdAt: d.createdAt, createdAtMillis, category: d.category || '일반', commentCount, comments: d.comments || [] };
+      return { id: doc.id, title: d.title, createdAt: d.createdAt, createdAtMillis, category: d.category || '일반', commentCount, comments: d.comments || [], isPinned: Boolean(d.isPinned) };
     });
+
+    // Fetch pinned posts separately (no orderBy to avoid composite index), only on first page
+    let pinnedItems: any[] = [];
+    if (!startAfter) {
+      const pinnedSnap = await db.collection('boardPosts').where('isPinned', '==', true).limit(50).get();
+      pinnedItems = pinnedSnap.docs.map((doc) => {
+        const d = doc.data() as any;
+        delete d.passwordHash; delete d.passwordSalt;
+        const createdAtMillis = (d.createdAt as FirebaseFirestore.Timestamp | undefined)?.toMillis?.() || (doc.createTime as any)?.toMillis?.() || (doc.updateTime as any)?.toMillis?.();
+        const derivedLen = Array.isArray(d.comments) ? d.comments.length : 0;
+        const commentCount = Math.max(Number(d.commentCount || 0), derivedLen);
+        return { id: doc.id, title: d.title, createdAt: d.createdAt, createdAtMillis, category: d.category || '일반', commentCount, comments: d.comments || [], isPinned: true };
+      });
+      // Sort pinned by createdAt desc in-memory
+      pinnedItems.sort((a, b) => (Number(b.createdAtMillis || 0) - Number(a.createdAtMillis || 0)));
+    }
     if (category) {
       rawItems = rawItems.filter((it: any) => String(it.category) === String(category));
     }
-    const items = rawItems.slice(0, pageLimit);
+    // Merge pinned (first) + recent (excluding duplicates)
+    const pinnedIds = new Set(pinnedItems.map((it: any) => String(it.id)));
+    const nonPinned = rawItems.filter((it: any) => !pinnedIds.has(String(it.id)));
+    const merged = [...pinnedItems, ...nonPinned];
+    const items = merged.slice(0, pageLimit);
     const last = snap.docs[snap.docs.length - 1];
     const nextCursor = last ? (last.get('createdAt') as FirebaseFirestore.Timestamp)?.toMillis?.() : null;
     return { items, nextCursor };
@@ -600,6 +649,25 @@ export const updateBoardPost = functions.https.onCall(async (data: any, _context
   }
 });
 
+/** Verify a post password without updating. Returns { ok: true } when valid */
+export const verifyBoardPostPassword = functions.https.onCall(async (data: any, _context) => {
+  try {
+    const { id, password } = data || {};
+    if (!id || !password) throw new functions.https.HttpsError('invalid-argument', 'id and password required');
+    const ref = db.collection('boardPosts').doc(String(id));
+    const snap = await ref.get();
+    if (!snap.exists) throw new functions.https.HttpsError('not-found', 'Post not found');
+    const d = snap.data() as any;
+    const { hash } = hashPassword(String(password), d.passwordSalt);
+    if (hash !== d.passwordHash) throw new functions.https.HttpsError('permission-denied', 'Invalid password');
+    return { ok: true };
+  } catch (error) {
+    functions.logger.error('verifyBoardPostPassword error', error);
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', 'Failed to verify password');
+  }
+});
+
 /** Delete post with password verification; try deleting images. */
 export const deleteBoardPost = functions.https.onCall(async (data: any, _context) => {
   try {
@@ -631,11 +699,103 @@ export const deleteBoardPost = functions.https.onCall(async (data: any, _context
   }
 });
 
+/** Admin: Fetch posts with full fields (no passwords), supports limit & category */
+export const getBoardPostsAdmin = functions.https.onCall(async (data: any, context) => {
+  assertIsAdmin(context);
+  try {
+    const { limit = 50, category } = data || {};
+    let query: FirebaseFirestore.Query = db.collection('boardPosts')
+      .orderBy('createdAt', 'desc');
+    const snap = await query.limit(Number(limit)).get();
+    let items = snap.docs.map((doc) => {
+      const d = doc.data() as any;
+      delete d.passwordHash; delete d.passwordSalt;
+      const createdAtMillis = (d.createdAt as FirebaseFirestore.Timestamp | undefined)?.toMillis?.() || (doc.createTime as any)?.toMillis?.() || (doc.updateTime as any)?.toMillis?.();
+      const derivedLen = Array.isArray(d.comments) ? d.comments.length : 0;
+      const commentCount = Math.max(Number(d.commentCount || 0), derivedLen);
+      return { id: doc.id, ...d, commentCount, createdAtMillis, isPinned: Boolean(d.isPinned) };
+    });
+    if (category) {
+      items = items.filter((it: any) => String(it.category) === String(category));
+    }
+    return { items };
+  } catch (error) {
+    functions.logger.error('getBoardPostsAdmin error', error);
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', 'Failed to fetch posts (admin)');
+  }
+});
+
+/** Admin: Update post without password; can set isPinned */
+export const updateBoardPostAdmin = functions.https.onCall(async (data: any, context) => {
+  assertIsAdmin(context);
+  try {
+    const { id } = data || {};
+    if (!id) throw new functions.https.HttpsError('invalid-argument', 'id is required');
+    const ref = db.collection('boardPosts').doc(String(id));
+    const snap = await ref.get();
+    if (!snap.exists) throw new functions.https.HttpsError('not-found', 'Post not found');
+    const update: any = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
+    if (typeof data.title !== 'undefined') update.title = String(data.title).slice(0, 80);
+    if (typeof data.content !== 'undefined') update.content = String(data.content).slice(0, 5000);
+    if (typeof data.category !== 'undefined') update.category = String(data.category);
+    if (Array.isArray(data.imageUrls)) update.imageUrls = (data.imageUrls as any[]).map((u) => String(u)).slice(0, 6);
+    if (typeof data.isPinned !== 'undefined') update.isPinned = Boolean(data.isPinned);
+    await ref.update(update);
+    return { success: true };
+  } catch (error) {
+    functions.logger.error('updateBoardPostAdmin error', error);
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', 'Failed to update post (admin)');
+  }
+});
+
+/** Admin: Delete post without password; also deletes images if any */
+export const deleteBoardPostAdmin = functions.https.onCall(async (data: any, context) => {
+  assertIsAdmin(context);
+  try {
+    const { id } = data || {};
+    if (!id) throw new functions.https.HttpsError('invalid-argument', 'id is required');
+    const ref = db.collection('boardPosts').doc(String(id));
+    const snap = await ref.get();
+    if (!snap.exists) throw new functions.https.HttpsError('not-found', 'Post not found');
+    const d = snap.data() as any;
+    try {
+      const bucket = getDefaultBucket();
+      const imgs: string[] = Array.isArray(d.imageUrls) ? d.imageUrls : [];
+      for (const u of imgs) {
+        const path = extractStoragePath(String(u));
+        if (path) await bucket.file(path).delete({ ignoreNotFound: true });
+      }
+    } catch (err) {
+      functions.logger.warn('Failed to delete board images (admin)', err as any);
+    }
+    await ref.delete();
+    return { success: true };
+  } catch (error) {
+    functions.logger.error('deleteBoardPostAdmin error', error);
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', 'Failed to delete post (admin)');
+  }
+});
+
 /** Add a comment with nickname and password */
-export const addBoardComment = functions.https.onCall(async (data: any, _context) => {
+export const addBoardComment = functions.https.onCall(async (data: any, context) => {
   try {
     const { id, nickname, content, password } = data || {};
     const ref = db.collection('boardPosts').doc(String(id));
+    // Best-effort client IP extraction from callable context
+    // rawRequest is available on callable context
+    const ipMasked = (() => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rawReq: any = (context as any)?.rawRequest;
+        const ip = extractClientIp(rawReq);
+        return maskIpForDisplay(ip);
+      } catch {
+        return undefined;
+      }
+    })();
     
     const result = await db.runTransaction(async (transaction) => {
       const snap = await transaction.get(ref);
@@ -653,7 +813,8 @@ export const addBoardComment = functions.https.onCall(async (data: any, _context
         content: text, 
         createdAt: admin.firestore.Timestamp.now(), 
         passwordSalt: salt, 
-        passwordHash: hash 
+        passwordHash: hash,
+        ipMasked
       };
       
       const currentData = snap.data() as any;

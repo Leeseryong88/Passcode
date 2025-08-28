@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.fixCommentCounts = exports.setSolverName = exports.getSolvedAnswer = exports.deleteBoardComment = exports.addBoardComment = exports.deleteBoardPost = exports.updateBoardPost = exports.getBoardPosts = exports.addBoardPost = exports.uploadImageAdmin = exports.setPuzzleSolvedAdmin = exports.deletePuzzlesBatchAdmin = exports.updatePuzzlesBatchAdmin = exports.deletePuzzleAdmin = exports.updatePuzzleAdmin = exports.createPuzzleAdmin = exports.getAllPuzzlesAdmin = exports.checkAnswer = exports.getPuzzles = void 0;
+exports.fixCommentCounts = exports.setSolverName = exports.getSolvedAnswer = exports.deleteBoardComment = exports.addBoardComment = exports.deleteBoardPostAdmin = exports.updateBoardPostAdmin = exports.getBoardPostsAdmin = exports.deleteBoardPost = exports.verifyBoardPostPassword = exports.updateBoardPost = exports.getBoardPosts = exports.addBoardPost = exports.uploadImageAdmin = exports.setPuzzleSolvedAdmin = exports.deletePuzzlesBatchAdmin = exports.updatePuzzlesBatchAdmin = exports.deletePuzzleAdmin = exports.updatePuzzleAdmin = exports.createPuzzleAdmin = exports.getAllPuzzlesAdmin = exports.checkAnswer = exports.getPuzzles = void 0;
 /* eslint-disable max-len */
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
@@ -40,6 +40,35 @@ function hashPassword(raw, salt) {
     const s = salt || (0, crypto_1.randomBytes)(8).toString('hex');
     const h = (0, crypto_1.createHash)('sha256').update(`${s}:${String(raw)}`).digest('hex');
     return { salt: s, hash: h };
+}
+function extractClientIp(req) {
+    var _a, _b, _c;
+    try {
+        const xfwd = (_a = req === null || req === void 0 ? void 0 : req.headers) === null || _a === void 0 ? void 0 : _a['x-forwarded-for'];
+        if (typeof xfwd === 'string' && xfwd.length > 0) {
+            return xfwd.split(',')[0].trim();
+        }
+        const ip = ((req === null || req === void 0 ? void 0 : req.ip) || ((_b = req === null || req === void 0 ? void 0 : req.connection) === null || _b === void 0 ? void 0 : _b.remoteAddress) || ((_c = req === null || req === void 0 ? void 0 : req.socket) === null || _c === void 0 ? void 0 : _c.remoteAddress));
+        return ip ? String(ip) : null;
+    }
+    catch (_d) {
+        return null;
+    }
+}
+function maskIpForDisplay(ip) {
+    if (!ip)
+        return undefined;
+    const v = String(ip);
+    if (v.includes(':')) {
+        const parts = v.split(':');
+        const head = parts.slice(0, 2).join(':');
+        return `${head}::****`;
+    }
+    const parts = v.split('.');
+    if (parts.length === 4) {
+        return `${parts[0]}.${parts[1]}.${parts[2]}.*`;
+    }
+    return undefined;
 }
 // function validateImageContentType removed (no longer used)
 /**
@@ -522,6 +551,7 @@ exports.addBoardPost = functions.https.onCall(async (data, _context) => {
             category,
             commentCount: 0,
             comments: [],
+            isPinned: false,
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             passwordSalt: salt,
@@ -574,12 +604,33 @@ exports.getBoardPosts = functions.https.onCall(async (data, _context) => {
             const createdAtMillis = ((_b = (_a = d.createdAt) === null || _a === void 0 ? void 0 : _a.toMillis) === null || _b === void 0 ? void 0 : _b.call(_a)) || ((_d = (_c = doc.createTime) === null || _c === void 0 ? void 0 : _c.toMillis) === null || _d === void 0 ? void 0 : _d.call(_c)) || ((_f = (_e = doc.updateTime) === null || _e === void 0 ? void 0 : _e.toMillis) === null || _f === void 0 ? void 0 : _f.call(_e));
             const derivedLen = Array.isArray(d.comments) ? d.comments.length : 0;
             const commentCount = Math.max(Number(d.commentCount || 0), derivedLen);
-            return { id: doc.id, title: d.title, createdAt: d.createdAt, createdAtMillis, category: d.category || '일반', commentCount, comments: d.comments || [] };
+            return { id: doc.id, title: d.title, createdAt: d.createdAt, createdAtMillis, category: d.category || '일반', commentCount, comments: d.comments || [], isPinned: Boolean(d.isPinned) };
         });
+        // Fetch pinned posts separately (no orderBy to avoid composite index), only on first page
+        let pinnedItems = [];
+        if (!startAfter) {
+            const pinnedSnap = await db.collection('boardPosts').where('isPinned', '==', true).limit(50).get();
+            pinnedItems = pinnedSnap.docs.map((doc) => {
+                var _a, _b, _c, _d, _e, _f;
+                const d = doc.data();
+                delete d.passwordHash;
+                delete d.passwordSalt;
+                const createdAtMillis = ((_b = (_a = d.createdAt) === null || _a === void 0 ? void 0 : _a.toMillis) === null || _b === void 0 ? void 0 : _b.call(_a)) || ((_d = (_c = doc.createTime) === null || _c === void 0 ? void 0 : _c.toMillis) === null || _d === void 0 ? void 0 : _d.call(_c)) || ((_f = (_e = doc.updateTime) === null || _e === void 0 ? void 0 : _e.toMillis) === null || _f === void 0 ? void 0 : _f.call(_e));
+                const derivedLen = Array.isArray(d.comments) ? d.comments.length : 0;
+                const commentCount = Math.max(Number(d.commentCount || 0), derivedLen);
+                return { id: doc.id, title: d.title, createdAt: d.createdAt, createdAtMillis, category: d.category || '일반', commentCount, comments: d.comments || [], isPinned: true };
+            });
+            // Sort pinned by createdAt desc in-memory
+            pinnedItems.sort((a, b) => (Number(b.createdAtMillis || 0) - Number(a.createdAtMillis || 0)));
+        }
         if (category) {
             rawItems = rawItems.filter((it) => String(it.category) === String(category));
         }
-        const items = rawItems.slice(0, pageLimit);
+        // Merge pinned (first) + recent (excluding duplicates)
+        const pinnedIds = new Set(pinnedItems.map((it) => String(it.id)));
+        const nonPinned = rawItems.filter((it) => !pinnedIds.has(String(it.id)));
+        const merged = [...pinnedItems, ...nonPinned];
+        const items = merged.slice(0, pageLimit);
         const last = snap.docs[snap.docs.length - 1];
         const nextCursor = last ? (_h = (_g = last.get('createdAt')) === null || _g === void 0 ? void 0 : _g.toMillis) === null || _h === void 0 ? void 0 : _h.call(_g) : null;
         return { items, nextCursor };
@@ -622,6 +673,29 @@ exports.updateBoardPost = functions.https.onCall(async (data, _context) => {
         throw new functions.https.HttpsError('internal', 'Failed to update post');
     }
 });
+/** Verify a post password without updating. Returns { ok: true } when valid */
+exports.verifyBoardPostPassword = functions.https.onCall(async (data, _context) => {
+    try {
+        const { id, password } = data || {};
+        if (!id || !password)
+            throw new functions.https.HttpsError('invalid-argument', 'id and password required');
+        const ref = db.collection('boardPosts').doc(String(id));
+        const snap = await ref.get();
+        if (!snap.exists)
+            throw new functions.https.HttpsError('not-found', 'Post not found');
+        const d = snap.data();
+        const { hash } = hashPassword(String(password), d.passwordSalt);
+        if (hash !== d.passwordHash)
+            throw new functions.https.HttpsError('permission-denied', 'Invalid password');
+        return { ok: true };
+    }
+    catch (error) {
+        functions.logger.error('verifyBoardPostPassword error', error);
+        if (error instanceof functions.https.HttpsError)
+            throw error;
+        throw new functions.https.HttpsError('internal', 'Failed to verify password');
+    }
+});
 /** Delete post with password verification; try deleting images. */
 exports.deleteBoardPost = functions.https.onCall(async (data, _context) => {
     try {
@@ -659,11 +733,120 @@ exports.deleteBoardPost = functions.https.onCall(async (data, _context) => {
         throw new functions.https.HttpsError('internal', 'Failed to delete post');
     }
 });
+/** Admin: Fetch posts with full fields (no passwords), supports limit & category */
+exports.getBoardPostsAdmin = functions.https.onCall(async (data, context) => {
+    assertIsAdmin(context);
+    try {
+        const { limit = 50, category } = data || {};
+        let query = db.collection('boardPosts')
+            .orderBy('createdAt', 'desc');
+        const snap = await query.limit(Number(limit)).get();
+        let items = snap.docs.map((doc) => {
+            var _a, _b, _c, _d, _e, _f;
+            const d = doc.data();
+            delete d.passwordHash;
+            delete d.passwordSalt;
+            const createdAtMillis = ((_b = (_a = d.createdAt) === null || _a === void 0 ? void 0 : _a.toMillis) === null || _b === void 0 ? void 0 : _b.call(_a)) || ((_d = (_c = doc.createTime) === null || _c === void 0 ? void 0 : _c.toMillis) === null || _d === void 0 ? void 0 : _d.call(_c)) || ((_f = (_e = doc.updateTime) === null || _e === void 0 ? void 0 : _e.toMillis) === null || _f === void 0 ? void 0 : _f.call(_e));
+            const derivedLen = Array.isArray(d.comments) ? d.comments.length : 0;
+            const commentCount = Math.max(Number(d.commentCount || 0), derivedLen);
+            return Object.assign(Object.assign({ id: doc.id }, d), { commentCount, createdAtMillis, isPinned: Boolean(d.isPinned) });
+        });
+        if (category) {
+            items = items.filter((it) => String(it.category) === String(category));
+        }
+        return { items };
+    }
+    catch (error) {
+        functions.logger.error('getBoardPostsAdmin error', error);
+        if (error instanceof functions.https.HttpsError)
+            throw error;
+        throw new functions.https.HttpsError('internal', 'Failed to fetch posts (admin)');
+    }
+});
+/** Admin: Update post without password; can set isPinned */
+exports.updateBoardPostAdmin = functions.https.onCall(async (data, context) => {
+    assertIsAdmin(context);
+    try {
+        const { id } = data || {};
+        if (!id)
+            throw new functions.https.HttpsError('invalid-argument', 'id is required');
+        const ref = db.collection('boardPosts').doc(String(id));
+        const snap = await ref.get();
+        if (!snap.exists)
+            throw new functions.https.HttpsError('not-found', 'Post not found');
+        const update = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
+        if (typeof data.title !== 'undefined')
+            update.title = String(data.title).slice(0, 80);
+        if (typeof data.content !== 'undefined')
+            update.content = String(data.content).slice(0, 5000);
+        if (typeof data.category !== 'undefined')
+            update.category = String(data.category);
+        if (Array.isArray(data.imageUrls))
+            update.imageUrls = data.imageUrls.map((u) => String(u)).slice(0, 6);
+        if (typeof data.isPinned !== 'undefined')
+            update.isPinned = Boolean(data.isPinned);
+        await ref.update(update);
+        return { success: true };
+    }
+    catch (error) {
+        functions.logger.error('updateBoardPostAdmin error', error);
+        if (error instanceof functions.https.HttpsError)
+            throw error;
+        throw new functions.https.HttpsError('internal', 'Failed to update post (admin)');
+    }
+});
+/** Admin: Delete post without password; also deletes images if any */
+exports.deleteBoardPostAdmin = functions.https.onCall(async (data, context) => {
+    assertIsAdmin(context);
+    try {
+        const { id } = data || {};
+        if (!id)
+            throw new functions.https.HttpsError('invalid-argument', 'id is required');
+        const ref = db.collection('boardPosts').doc(String(id));
+        const snap = await ref.get();
+        if (!snap.exists)
+            throw new functions.https.HttpsError('not-found', 'Post not found');
+        const d = snap.data();
+        try {
+            const bucket = getDefaultBucket();
+            const imgs = Array.isArray(d.imageUrls) ? d.imageUrls : [];
+            for (const u of imgs) {
+                const path = extractStoragePath(String(u));
+                if (path)
+                    await bucket.file(path).delete({ ignoreNotFound: true });
+            }
+        }
+        catch (err) {
+            functions.logger.warn('Failed to delete board images (admin)', err);
+        }
+        await ref.delete();
+        return { success: true };
+    }
+    catch (error) {
+        functions.logger.error('deleteBoardPostAdmin error', error);
+        if (error instanceof functions.https.HttpsError)
+            throw error;
+        throw new functions.https.HttpsError('internal', 'Failed to delete post (admin)');
+    }
+});
 /** Add a comment with nickname and password */
-exports.addBoardComment = functions.https.onCall(async (data, _context) => {
+exports.addBoardComment = functions.https.onCall(async (data, context) => {
     try {
         const { id, nickname, content, password } = data || {};
         const ref = db.collection('boardPosts').doc(String(id));
+        // Best-effort client IP extraction from callable context
+        // rawRequest is available on callable context
+        const ipMasked = (() => {
+            try {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const rawReq = context === null || context === void 0 ? void 0 : context.rawRequest;
+                const ip = extractClientIp(rawReq);
+                return maskIpForDisplay(ip);
+            }
+            catch (_a) {
+                return undefined;
+            }
+        })();
         const result = await db.runTransaction(async (transaction) => {
             const snap = await transaction.get(ref);
             if (!snap.exists)
@@ -680,7 +863,8 @@ exports.addBoardComment = functions.https.onCall(async (data, _context) => {
                 content: text,
                 createdAt: admin.firestore.Timestamp.now(),
                 passwordSalt: salt,
-                passwordHash: hash
+                passwordHash: hash,
+                ipMasked
             };
             const currentData = snap.data();
             const currentComments = Array.isArray(currentData === null || currentData === void 0 ? void 0 : currentData.comments) ? currentData.comments : [];

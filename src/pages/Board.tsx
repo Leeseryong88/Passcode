@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Header from '../../components/Header';
-import { fetchBoardPosts, createBoardPost, fetchBoardPost, addBoardComment, deleteBoardComment, deleteBoardPost } from '../../api/board';
+import { fetchBoardPosts, createBoardPost, fetchBoardPost, addBoardComment, deleteBoardComment, deleteBoardPost, updateBoardPost, verifyBoardPostPassword } from '../../api/board';
 import { Send, Trash2, Lock } from 'lucide-react';
 
 type Post = {
@@ -38,6 +38,14 @@ const Board: React.FC = () => {
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activePost, setActivePost] = useState<Post | null>(null);
+  const [isEditPostOpen, setIsEditPostOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editContent, setEditContent] = useState('');
+  // Password-first verification state
+  const [isPwVerifyOpen, setIsPwVerifyOpen] = useState(false);
+  const [pwInput, setPwInput] = useState('');
+  const [pwError, setPwError] = useState('');
+  const [verifiedPassword, setVerifiedPassword] = useState<string | null>(null);
   const [commentNickname, setCommentNickname] = useState('');
   const [commentPassword, setCommentPassword] = useState('');
   const [commentText, setCommentText] = useState('');
@@ -166,6 +174,48 @@ const Board: React.FC = () => {
     }
   };
 
+  const openEdit = () => {
+    if (!activePost) return;
+    setPwInput('');
+    setPwError('');
+    setIsPwVerifyOpen(true);
+  };
+
+  const confirmPasswordAndOpenEdit = async () => {
+    if (!activePost) return;
+    const pw = pwInput.trim();
+    if (!pw) {
+      setPwError('비밀번호를 입력해 주세요');
+      return;
+    }
+    setPwError('');
+    try {
+      await verifyBoardPostPassword({ id: activePost.id, password: pw });
+      setVerifiedPassword(pw);
+      setEditTitle(activePost.title || '');
+      setEditContent((activePost as any).content || '');
+      setIsPwVerifyOpen(false);
+      setIsEditPostOpen(true);
+    } catch (e: any) {
+      setPwError(e.message || '비밀번호가 올바르지 않습니다');
+    }
+  };
+
+  const submitEdit = async () => {
+    if (!activePost) return;
+    try {
+      await updateBoardPost({ id: activePost.id, password: String(verifiedPassword || ''), title: editTitle, content: editContent });
+      const refreshed = await fetchBoardPost(activePost.id);
+      const normalized = normalizePost(refreshed);
+      setActivePost(normalized);
+      // 목록에도 제목이 반영되도록 동기화
+      setPosts((prev) => prev.map((p) => p.id === normalized.id ? ({ ...p, title: normalized.title, content: (normalized as any).content }) as any : p));
+      setIsEditPostOpen(false);
+    } catch (e: any) {
+      alert(e.message || '수정 실패');
+    }
+  };
+
   const submitComment = async () => {
     if (!activePost) return;
     try {
@@ -265,20 +315,62 @@ const Board: React.FC = () => {
           <div className="text-center text-red-400">{error}</div>
         ) : (
           activePost ? (
+            <>
             <div className="p-4 bg-gray-800 border border-gray-700 rounded-xl">
               <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold">{activePost.title}</h3>
-                <button onClick={() => onDelete(activePost.id)} className="text-red-300 hover:text-red-200 px-2 py-1 rounded"><Trash2 className="w-4 h-4" /></button>
+                {isEditPostOpen ? (
+                  <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="제목" className="flex-1 mr-3 px-3 py-2 bg-gray-700 border border-gray-600 rounded" />
+                ) : (
+                  <h3 className="text-xl font-bold">{activePost.title}</h3>
+                )}
+                <div className="flex items-center gap-2">
+                  {!isEditPostOpen && !isPwVerifyOpen && (
+                    <button onClick={openEdit} className="px-2 py-1 text-sm bg-gray-700 hover:bg-gray-600 rounded">수정</button>
+                  )}
+                  <button onClick={() => onDelete(activePost.id)} className="text-red-300 hover:text-red-200 px-2 py-1 rounded"><Trash2 className="w-4 h-4" /></button>
+                </div>
               </div>
               <div className="mt-1 text-xs text-gray-400">{timeAgo((activePost as any).createdAt, (activePost as any).createdAtMillis)} · 댓글 {(activePost as any).commentCount ?? ((activePost as any).comments?.length || 0)}개</div>
-              <p className="mt-2 text-gray-200 whitespace-pre-wrap">{activePost.content}</p>
+              {isPwVerifyOpen && (
+                <div className="mt-3 p-3 bg-gray-900 rounded-lg border border-gray-700">
+                  <div className="flex items-center gap-2">
+                    <Lock className="w-4 h-4 text-gray-300" />
+                    <input
+                      type="password"
+                      value={pwInput}
+                      onChange={(e) => setPwInput(e.target.value)}
+                      placeholder="비밀번호"
+                      className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded"
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); confirmPasswordAndOpenEdit(); } }}
+                      autoFocus
+                    />
+                    <button onClick={confirmPasswordAndOpenEdit} className="px-3 py-2 rounded bg-cyan-600 hover:bg-cyan-700 text-white">확인</button>
+                    <button onClick={() => setIsPwVerifyOpen(false)} className="px-3 py-2 rounded border border-gray-600 text-gray-200 hover:bg-gray-700">취소</button>
+                  </div>
+                  {pwError && <div className="mt-2 text-sm text-red-400">{pwError}</div>}
+                </div>
+              )}
+              {isEditPostOpen ? (
+                <div className="mt-3 space-y-3">
+                  <textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} placeholder="내용" rows={8} className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded" />
+                  <div className="flex justify-end gap-2">
+                    <button onClick={() => setIsEditPostOpen(false)} className="px-4 py-2 rounded border border-gray-600 text-gray-200 hover:bg-gray-700">취소</button>
+                    <button onClick={submitEdit} disabled={!editTitle || !editContent || !verifiedPassword} className="px-4 py-2 rounded bg-cyan-600 hover:bg-cyan-700 text-white disabled:bg-gray-600">저장</button>
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-2 text-gray-200 whitespace-pre-wrap">{activePost.content}</p>
+              )}
               <div className="mt-6 p-3 bg-gray-900 rounded-lg border border-gray-700">
                 <h4 className="font-semibold mb-3">댓글 {(activePost as any).commentCount ?? ((activePost as any).comments?.length || 0)}</h4>
                 <div className="space-y-2 mb-4">
                   {(activePost.comments || []).map((c) => (
                     <div key={c.id} className="p-2 bg-gray-800 border border-gray-700 rounded flex justify-between">
                       <div>
-                        <div className="text-sm text-cyan-300">{c.nickname}</div>
+                        <div className="text-sm text-cyan-300 flex items-center gap-2">
+                          <span>{c.nickname}</span>
+                          {(c as any).ipMasked && <span className="text-xs text-gray-400">({(c as any).ipMasked})</span>}
+                        </div>
                         <div className="text-gray-200 whitespace-pre-wrap">{c.content}</div>
                       </div>
                       <button onClick={() => removeComment(c.id)} className="text-red-300 hover:text-red-200">삭제</button>
@@ -319,6 +411,8 @@ const Board: React.FC = () => {
                 <button onClick={() => { window.history.pushState({}, '', '/board'); setActivePost(null); }} className="text-sm text-gray-300 underline">목록으로</button>
               </div>
             </div>
+            {/* 인라인 편집/검증으로 전환됨 */}
+            </>
           ) : (
             <div className="space-y-2">
               {filtered.length === 0 ? (

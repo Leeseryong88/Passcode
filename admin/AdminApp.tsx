@@ -4,6 +4,7 @@ import { isCurrentUserAdmin, onAuthStateChangedListener, signInWithEmailPassword
 import { uploadImageAdminCallable } from '../firebase';
 import { getAllPuzzlesAdmin, createPuzzleAdmin, updatePuzzleAdmin, deletePuzzleAdmin } from '../api/puzzles';
 import type { PublicPuzzle } from '../types';
+import { adminFetchBoardPosts, adminUpdateBoardPost, adminDeleteBoardPost } from '../api/board';
 
 type AdminPuzzle = PublicPuzzle & { answer?: string; recoveryPhrase?: string; docId?: string };
 
@@ -11,11 +12,17 @@ const AdminApp: React.FC = () => {
   const { t } = useTranslation();
   const [isAuthed, setIsAuthed] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [adminTab, setAdminTab] = useState<'puzzles' | 'board'>('puzzles');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [puzzles, setPuzzles] = useState<AdminPuzzle[]>([]);
   const [loading, setLoading] = useState(false);
+  // Board admin state
+  const [boardPosts, setBoardPosts] = useState<any[]>([]);
+  const [loadingBoard, setLoadingBoard] = useState(false);
+  const [isBoardEditOpen, setIsBoardEditOpen] = useState(false);
+  const [boardEditDraft, setBoardEditDraft] = useState<any | null>(null);
   const [newPuzzle, setNewPuzzle] = useState<any>({
     id: '',
     imageUrl: '',
@@ -75,8 +82,10 @@ const AdminApp: React.FC = () => {
       setIsAdmin(admin);
       if (user && admin) {
         void fetchPuzzles();
+        void fetchBoardAdmin();
       } else {
         setPuzzles([]);
+        setBoardPosts([]);
       }
     });
     return () => unsub();
@@ -98,6 +107,19 @@ const AdminApp: React.FC = () => {
       setError(e.message || 'Failed to load puzzles');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchBoardAdmin = async () => {
+    setLoadingBoard(true);
+    setError(null);
+    try {
+      const data = await adminFetchBoardPosts(100);
+      setBoardPosts((data.items ?? data) as any[]);
+    } catch (e: any) {
+      setError(e.message || 'Failed to load board posts');
+    } finally {
+      setLoadingBoard(false);
     }
   };
 
@@ -207,42 +229,47 @@ const AdminApp: React.FC = () => {
           <h1 className="text-2xl font-bold">{t('admin_panel')}</h1>
           <button onClick={handleLogout} className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">{t('logout')}</button>
         </div>
+        {/* Tabs */}
+        <div className="mb-4 inline-flex rounded-lg border border-gray-700 overflow-hidden">
+          <button className={`${adminTab==='puzzles' ? 'bg-cyan-600 text-white' : 'bg-gray-800 text-gray-300'} px-4 py-2`} onClick={() => setAdminTab('puzzles')}>퍼즐</button>
+          <button className={`${adminTab==='board' ? 'bg-cyan-600 text-white' : 'bg-gray-800 text-gray-300'} px-4 py-2 border-l border-gray-700`} onClick={() => setAdminTab('board')}>게시판</button>
+        </div>
         {error && <div className="mb-3 text-sm text-red-400">{error}</div>}
-
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          <div className="xl:col-span-2">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="font-semibold">{t('puzzle_list')}</h2>
-              <button onClick={fetchPuzzles} className="text-sm bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded">Reload</button>
-            </div>
-            {loading ? (
-              <div>Loading...</div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                {puzzles.map((p) => (
-                  <div key={p.id} className={`relative bg-gray-800 border ${p.isSolved ? 'border-green-500/50' : 'border-gray-700'} rounded-xl shadow-lg overflow-hidden transition-colors duration-200 hover:shadow-cyan-500/10 cursor-pointer`} onClick={() => openEdit(p)}>
-                    {p.isSolved && (
-                      <span className="absolute top-2 left-2 text-xs font-semibold bg-green-700/70 text-green-100 px-2 py-0.5 rounded">Solved</span>
-                    )}
-                <img src={p.imageUrl} alt={`puzzle`} className="w-full h-36 object-cover" />
-                    <div className="p-3 space-y-2">
-                      <div className="flex items-center justify-end">
-                        <span className="text-xs font-semibold bg-yellow-600/20 text-yellow-300 px-2 py-0.5 rounded">{p.rewardAmount}</span>
-                      </div>
-                      <div className="flex flex-wrap gap-2 text-xs">
-                        <span className={`px-2 py-0.5 rounded ${p.isPublished ? 'bg-blue-600/20 text-blue-300' : 'bg-gray-600/20 text-gray-300'}`}>{p.isPublished ? 'Published' : 'Unpublished'}</span>
-                        <span className="px-2 py-0.5 rounded bg-purple-600/20 text-purple-300">{(p as any).rewardType || 'metamask'}</span>
-                        <span className="px-2 py-0.5 rounded bg-red-600/20 text-red-300">{t('wrong_attempts_count', { count: (p as any).wrongAttempts || 0 })}</span>
+        {adminTab === 'puzzles' ? (
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <div className="xl:col-span-2">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="font-semibold">{t('puzzle_list')}</h2>
+                <button onClick={fetchPuzzles} className="text-sm bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded">Reload</button>
+              </div>
+              {loading ? (
+                <div>Loading...</div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {puzzles.map((p) => (
+                    <div key={p.id} className={`relative bg-gray-800 border ${p.isSolved ? 'border-green-500/50' : 'border-gray-700'} rounded-xl shadow-lg overflow-hidden transition-colors duration-200 hover:shadow-cyan-500/10 cursor-pointer`} onClick={() => openEdit(p)}>
+                      {p.isSolved && (
+                        <span className="absolute top-2 left-2 text-xs font-semibold bg-green-700/70 text-green-100 px-2 py-0.5 rounded">Solved</span>
+                      )}
+                      <img src={p.imageUrl} alt={`puzzle`} className="w-full h-36 object-cover" />
+                      <div className="p-3 space-y-2">
+                        <div className="flex items-center justify-end">
+                          <span className="text-xs font-semibold bg-yellow-600/20 text-yellow-300 px-2 py-0.5 rounded">{p.rewardAmount}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2 text-xs">
+                          <span className={`px-2 py-0.5 rounded ${p.isPublished ? 'bg-blue-600/20 text-blue-300' : 'bg-gray-600/20 text-gray-300'}`}>{p.isPublished ? 'Published' : 'Unpublished'}</span>
+                          <span className="px-2 py-0.5 rounded bg-purple-600/20 text-purple-300">{(p as any).rewardType || 'metamask'}</span>
+                          <span className="px-2 py-0.5 rounded bg-red-600/20 text-red-300">{t('wrong_attempts_count', { count: (p as any).wrongAttempts || 0 })}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-            <h2 className="font-semibold mb-3">{t('new_puzzle')}</h2>
-            <form onSubmit={handleCreate} className="space-y-2">
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
+              <h2 className="font-semibold mb-3">{t('new_puzzle')}</h2>
+              <form onSubmit={handleCreate} className="space-y-2">
               <input className="w-full px-3 py-2 bg-gray-700 rounded" placeholder="id" value={newPuzzle.id} onChange={(e) => setNewPuzzle((s: any) => ({ ...s, id: e.target.value }))} />
               <div className="flex items-center gap-2">
                 <input type="checkbox" id="isPublished" checked={Boolean(newPuzzle.isPublished)} onChange={(e) => setNewPuzzle((s: any) => ({...s, isPublished: e.target.checked}))} />
@@ -295,11 +322,37 @@ const AdminApp: React.FC = () => {
               {newPuzzle.rewardType === 'text' && (
                 <textarea className="w-full px-3 py-2 bg-gray-700 rounded" placeholder="revealText" value={(newPuzzle as any).revealText || ''} onChange={(e) => setNewPuzzle((s: any) => ({ ...s, revealText: e.target.value }))} />
               )}
-              <button className="w-full bg-cyan-600 hover:bg-cyan-700 py-2 rounded font-semibold">{t('create')}</button>
-            </form>
+                <button className="w-full bg-cyan-600 hover:bg-cyan-700 py-2 rounded font-semibold">{t('create')}</button>
+              </form>
+            </div>
           </div>
-        </div>
-        {/* Edit Modal */}
+        ) : (
+          <div className="grid grid-cols-1 gap-6">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="font-semibold">게시판 글 관리</h2>
+              <button onClick={fetchBoardAdmin} className="text-sm bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded">Reload</button>
+            </div>
+            {loadingBoard ? (
+              <div>Loading...</div>
+            ) : (
+              <div className="space-y-2">
+                {boardPosts.map((bp) => (
+                  <div key={bp.id} className="p-3 bg-gray-800 border border-gray-700 rounded-lg flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {bp.isPinned && <span className="px-2 py-0.5 text-xs rounded bg-yellow-700/30 text-yellow-300">PIN</span>}
+                      <span className="text-sm px-2 py-0.5 rounded bg-gray-700 text-gray-300">{bp.category || '일반'}</span>
+                      <span className="font-semibold">{bp.title}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button className="text-sm bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded" onClick={() => { setBoardEditDraft({ ...bp }); setIsBoardEditOpen(true); }}>편집</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        {/* Puzzle Edit Modal */}
         {isEditOpen && editDraft && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={closeEdit}>
             <div className="w-full max-w-2xl bg-gray-800 border border-gray-700 rounded-xl p-4" onClick={(e) => e.stopPropagation()}>
@@ -393,6 +446,43 @@ const AdminApp: React.FC = () => {
               <div className="mt-4 flex items-center justify-end gap-2">
                 <button className="bg-red-700 hover:bg-red-600 px-3 py-2 rounded text-sm" onClick={handleDeleteEdit}>{t('delete')}</button>
                 <button className="bg-green-700 hover:bg-green-600 px-3 py-2 rounded text-sm" onClick={handleSaveEdit}>{t('save')}</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Board Edit Modal */}
+        {isBoardEditOpen && boardEditDraft && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setIsBoardEditOpen(false)}>
+            <div className="w-full max-w-2xl bg-gray-800 border border-gray-700 rounded-xl p-4" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold">게시글 편집</h3>
+                <button className="text-sm bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded" onClick={() => setIsBoardEditOpen(false)}>Close</button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <label className="text-xs opacity-80">ID
+                  <input className="w-full px-3 py-2 bg-gray-800 rounded opacity-70 cursor-not-allowed" value={String(boardEditDraft.id)} disabled />
+                </label>
+                <label className="text-xs opacity-80">분류
+                  <select className="w-full px-3 py-2 bg-gray-700 rounded" value={String(boardEditDraft.category || '일반')} onChange={(e) => setBoardEditDraft((s:any) => ({ ...s, category: e.target.value }))}>
+                    <option value="일반">일반</option>
+                    <option value="퍼즐">퍼즐</option>
+                  </select>
+                </label>
+                <label className="text-xs opacity-80 md:col-span-2">제목
+                  <input className="w-full px-3 py-2 bg-gray-700 rounded" value={boardEditDraft.title || ''} onChange={(e) => setBoardEditDraft((s:any) => ({ ...s, title: e.target.value }))} />
+                </label>
+                <label className="text-xs opacity-80 md:col-span-2">내용
+                  <textarea className="w-full px-3 py-2 bg-gray-700 rounded" rows={8} value={boardEditDraft.content || ''} onChange={(e) => setBoardEditDraft((s:any) => ({ ...s, content: e.target.value }))} />
+                </label>
+                <label className="text-xs opacity-80 flex items-center gap-2 md:col-span-2">
+                  <input type="checkbox" checked={Boolean(boardEditDraft.isPinned)} onChange={(e) => setBoardEditDraft((s:any) => ({ ...s, isPinned: e.target.checked }))} />
+                  <span>상단 고정</span>
+                </label>
+              </div>
+              <div className="mt-4 flex items-center justify-end gap-2">
+                <button className="bg-red-700 hover:bg-red-600 px-3 py-2 rounded text-sm" onClick={async () => { try { await adminDeleteBoardPost(String(boardEditDraft.id)); setIsBoardEditOpen(false); await fetchBoardAdmin(); } catch (e:any) { setError(e.message || 'Delete failed'); } }}>삭제</button>
+                <button className="bg-green-700 hover:bg-green-600 px-3 py-2 rounded text-sm" onClick={async () => { try { await adminUpdateBoardPost({ id: String(boardEditDraft.id), title: boardEditDraft.title, content: boardEditDraft.content, category: boardEditDraft.category, isPinned: Boolean(boardEditDraft.isPinned) }); setIsBoardEditOpen(false); await fetchBoardAdmin(); } catch (e:any) { setError(e.message || 'Save failed'); } }}>저장</button>
               </div>
             </div>
           </div>

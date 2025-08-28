@@ -61,6 +61,11 @@ export const uploadBoardImageCallable = httpsCallable(functionsInst, 'uploadBoar
 export const updateBoardPostCallable = httpsCallable(functionsInst, 'updateBoardPost');
 export const deleteBoardPostCallable = httpsCallable(functionsInst, 'deleteBoardPost');
 export const fixCommentCountsCallable = httpsCallable(functionsInst, 'fixCommentCounts');
+export const verifyBoardPostPasswordCallable = httpsCallable(functionsInst, 'verifyBoardPostPassword');
+// Admin board callables
+export const getBoardPostsAdminCallable = httpsCallable(functionsInst, 'getBoardPostsAdmin');
+export const updateBoardPostAdminCallable = httpsCallable(functionsInst, 'updateBoardPostAdmin');
+export const deleteBoardPostAdminCallable = httpsCallable(functionsInst, 'deleteBoardPostAdmin');
 
 // Admin callables
 export const getAllPuzzlesAdminCallable = httpsCallable(functionsInst, 'getAllPuzzlesAdmin');
