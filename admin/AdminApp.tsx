@@ -28,6 +28,7 @@ const AdminApp: React.FC = () => {
     isPublished: false,
     rewardType: 'metamask',
     revealImageUrl: '',
+    puzzleName: '',
   });
 
   // Edit modal state
@@ -171,7 +172,7 @@ const AdminApp: React.FC = () => {
         isPublished: Boolean(newPuzzle.isPublished),
       };
       await createPuzzleAdmin(payload);
-      setNewPuzzle({ id: '', imageUrl: '', walletaddress: '', rewardAmount: '', explorerLink: '', answer: '', recoveryPhrase: '', isSolved: false, isPublished: false, rewardType: 'metamask', revealImageUrl: '' });
+      setNewPuzzle({ id: '', imageUrl: '', walletaddress: '', rewardAmount: '', explorerLink: '', answer: '', recoveryPhrase: '', isSolved: false, isPublished: false, rewardType: 'metamask', revealImageUrl: '', puzzleName: '' });
       await fetchPuzzles();
     } catch (e: any) {
       setError(e.message || 'Create failed');
@@ -264,6 +265,7 @@ const AdminApp: React.FC = () => {
                 <option value="text">Text</option>
               </select>
               <input className="w-full px-3 py-2 bg-gray-700 rounded" placeholder="puzzleType (e.g., cipher, logic, image, riddle)" value={(newPuzzle as any).puzzleType || ''} onChange={(e) => setNewPuzzle((s: any) => ({ ...s, puzzleType: e.target.value }))} />
+              <input className="w-full px-3 py-2 bg-gray-700 rounded" placeholder="puzzleName (카드 상단에 표시될 이름)" value={(newPuzzle as any).puzzleName || ''} onChange={(e) => setNewPuzzle((s: any) => ({ ...s, puzzleName: e.target.value }))} />
               {newPuzzle.rewardType === 'metamask' && (
                 <input className="w-full px-3 py-2 bg-gray-700 rounded" placeholder="walletaddress" value={newPuzzle.walletaddress} onChange={(e) => setNewPuzzle((s: any) => ({ ...s, walletaddress: e.target.value }))} />
               )}
@@ -333,6 +335,9 @@ const AdminApp: React.FC = () => {
                 </label>
                 <label className="text-xs opacity-80">Puzzle Type
                   <input className="w-full px-3 py-2 bg-gray-700 rounded" value={(editDraft as any).puzzleType || ''} onChange={(e) => handleEditFieldChange('puzzleType', e.target.value)} />
+                </label>
+                <label className="text-xs opacity-80">Puzzle Name
+                  <input className="w-full px-3 py-2 bg-gray-700 rounded" value={(editDraft as any).puzzleName || ''} onChange={(e) => handleEditFieldChange('puzzleName', e.target.value)} />
                 </label>
                 <label className="text-xs opacity-80">Image Path
                   <input className="w-full px-3 py-2 bg-gray-700 rounded" value={(editDraft as any).imagePath || ''} onChange={(e) => handleEditFieldChange('imagePath', e.target.value)} />

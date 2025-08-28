@@ -13,6 +13,8 @@ export interface PrivatePuzzle {
   solverName?: string;
   // 새 필드: 퍼즐 유형(예: logic, cipher, image, riddle 등)
   puzzleType?: string;
+  // 새 필드: 퍼즐 이름
+  puzzleName?: string;
   answer: string;
   recoveryPhrase: string;
   // Reward handling

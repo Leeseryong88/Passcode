@@ -119,11 +119,18 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
         />
         <div className="p-4">
           <div className="flex items-center justify-between mb-3">
-            {(puzzle as any).puzzleType && (
-              <span className="text-[10px] sm:text-xs font-semibold bg-purple-600/20 text-purple-300 px-2 py-0.5 rounded">
-                {(puzzle as any).puzzleType}
-              </span>
-            )}
+            <div className="flex flex-col gap-1">
+              {(puzzle as any).puzzleName && (
+                <span className="inline-block max-w-[16rem] text-[10px] sm:text-xs font-semibold bg-cyan-600/20 text-cyan-200 px-2 py-0.5 rounded truncate" title={(puzzle as any).puzzleName}>
+                  {(puzzle as any).puzzleName}
+                </span>
+              )}
+              {(puzzle as any).puzzleType && (
+                <span className="inline-block text-[10px] sm:text-xs font-semibold bg-purple-600/20 text-purple-300 px-2 py-0.5 rounded">
+                  {(puzzle as any).puzzleType}
+                </span>
+              )}
+            </div>
             {isSolved && (
               <span className="text-[10px] sm:text-xs font-semibold bg-yellow-600/20 text-yellow-300 px-2 py-0.5 rounded">{puzzle.rewardAmount}</span>
             )}
