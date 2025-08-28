@@ -61,6 +61,7 @@
   ,
   "nav_home": "Home",
   "nav_about": "About",
+  "nav_board": "Board",
   "nav_play": "Play",
   "landing_title": "Solve. Learn. Win.",
   "landing_subtitle": "Cryptography-inspired image puzzles with one-time rewards and a global leaderboard.",

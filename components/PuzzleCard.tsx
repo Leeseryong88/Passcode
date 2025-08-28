@@ -118,25 +118,33 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
           onClick={() => setIsImageModalOpen(true)}
         />
         <div className="p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex flex-col gap-1">
+          {/* Top two-row grid: left column for title/type, right column for reward/attempts */}
+          <div className="grid grid-cols-[1fr_auto] gap-x-3 mb-3">
+            {/* Row 1: puzzle name & reward */}
+            <div className="flex items-center min-h-6">
               {(puzzle as any).puzzleName && (
-                <span className="inline-block max-w-[16rem] text-[10px] sm:text-xs font-semibold bg-cyan-600/20 text-cyan-200 px-2 py-0.5 rounded truncate" title={(puzzle as any).puzzleName}>
+                <span className="inline-flex items-center max-w-[16rem] h-6 text-[10px] sm:text-xs font-semibold bg-cyan-600/20 text-cyan-200 px-2 rounded truncate" title={(puzzle as any).puzzleName}>
                   {(puzzle as any).puzzleName}
                 </span>
               )}
+            </div>
+            <div className="flex items-center justify-end min-h-6">
+              {isSolved && (
+                <span className="inline-flex items-center h-6 text-[10px] sm:text-xs font-semibold bg-yellow-600/20 text-yellow-300 px-2 rounded">{puzzle.rewardAmount}</span>
+              )}
+            </div>
+
+            {/* Row 2: puzzle type & failed attempts */}
+            <div className="flex items-center min-h-6">
               {(puzzle as any).puzzleType && (
-                <span className="inline-block text-[10px] sm:text-xs font-semibold bg-purple-600/20 text-purple-300 px-2 py-0.5 rounded">
+                <span className="inline-flex items-center h-6 text-[10px] sm:text-xs font-semibold bg-purple-600/20 text-purple-300 px-2 rounded">
                   {(puzzle as any).puzzleType}
                 </span>
               )}
             </div>
-            {isSolved && (
-              <span className="text-[10px] sm:text-xs font-semibold bg-yellow-600/20 text-yellow-300 px-2 py-0.5 rounded">{puzzle.rewardAmount}</span>
-            )}
-          </div>
-          <div className="flex justify-end mb-2">
-            <span className="text-[10px] sm:text-xs font-semibold bg-red-600/20 text-red-300 px-2 py-0.5 rounded">{t('wrong_attempts_count', { count: (puzzle as any).wrongAttempts || 0 })}</span>
+            <div className="flex items-center justify-end min-h-6">
+              <span className="inline-flex items-center h-6 text-[10px] sm:text-xs font-semibold bg-red-600/20 text-red-300 px-2 rounded">{t('wrong_attempts_count', { count: (puzzle as any).wrongAttempts || 0 })}</span>
+            </div>
           </div>
           {isSolved && (!puzzle.rewardType || puzzle.rewardType === 'metamask') && (
             <div className="bg-gray-900/40 p-2 rounded-lg mb-3 space-y-1 text-xs">
