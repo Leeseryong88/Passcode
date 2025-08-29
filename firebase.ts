@@ -45,7 +45,13 @@ if (typeof window !== 'undefined') {
 // Functions는 즉시 초기화하되, 다른 무거운 모듈은 지연
 export const functionsInst = getFunctions(app, 'us-central1');
 // Optional: explicitly route to regional endpoint (can help with some CORS/proxy setups)
-(functionsInst as any).customDomain = 'https://us-central1-crypto-puzzle-e089f.cloudfunctions.net';
+// Note: forcing customDomain can break callable CORS in some environments; keep disabled by default.
+try {
+  const custom = (import.meta as any).env?.VITE_FUNCTIONS_CUSTOM_DOMAIN as string | undefined;
+  if (custom) {
+    (functionsInst as any).customDomain = custom;
+  }
+} catch {}
 
 // Create callable function references. The name must match the deployed function name.
 export const getPuzzlesCallable = httpsCallable(functionsInst, 'getPuzzles');
@@ -75,6 +81,13 @@ export const deletePuzzleAdminCallable = httpsCallable(functionsInst, 'deletePuz
 export const setPuzzleSolvedAdminCallable = httpsCallable(functionsInst, 'setPuzzleSolvedAdmin');
 // grantAdminRole callable removed
 export const uploadImageAdminCallable = httpsCallable(functionsInst, 'uploadImageAdmin');
+
+// Ads callables
+export const getAdsCallable = httpsCallable(functionsInst, 'getAds');
+export const getAllAdsAdminCallable = httpsCallable(functionsInst, 'getAllAdsAdmin');
+export const createAdAdminCallable = httpsCallable(functionsInst, 'createAdAdmin');
+export const updateAdAdminCallable = httpsCallable(functionsInst, 'updateAdAdmin');
+export const deleteAdAdminCallable = httpsCallable(functionsInst, 'deleteAdAdmin');
 
 // Auth helpers
 export async function signInWithEmailPassword(email: string, password: string) {

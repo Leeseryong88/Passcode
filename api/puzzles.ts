@@ -8,9 +8,15 @@ import {
   updatePuzzleAdminCallable,
   deletePuzzleAdminCallable,
   setPuzzleSolvedAdminCallable,
+  getAdsCallable,
+  getAllAdsAdminCallable,
+  createAdAdminCallable,
+  updateAdAdminCallable,
+  deleteAdAdminCallable,
   // batch
   // We'll reference these via httpsCallable using functions names at runtime if not exported here
 } from '../firebase';
+import { auth } from '../firebase';
 
 /**
  * Fetches public puzzle data from the live Firebase Cloud Function using a callable function.
@@ -114,6 +120,38 @@ export const updatePuzzlesBatchAdmin = async (updates: any[]): Promise<{ success
   const callable = httpsCallable(functions as any, 'updatePuzzlesBatchAdmin');
   const result: any = await callable({ updates });
   return result.data as { success: boolean };
+};
+
+// Ads APIs
+export type PublicAd = { id: number; shortUrl: string; imageUrl?: string; isActive: boolean };
+
+export const getPublicAds = async (): Promise<PublicAd[]> => {
+  const res = await getAdsCallable();
+  return (res.data as any[]) as PublicAd[];
+};
+
+export const getAllAdsAdmin = async (): Promise<any[]> => {
+  try { await auth.currentUser?.getIdToken(true); } catch {}
+  const res = await getAllAdsAdminCallable();
+  return (res.data as any)?.items ?? (res.data as any);
+};
+
+export const createAdAdmin = async (payload: { id: number; shortUrl: string; isActive?: boolean }): Promise<{ success: boolean; docId: string }> => {
+  try { await auth.currentUser?.getIdToken(true); } catch {}
+  const res = await createAdAdminCallable(payload);
+  return res.data as any;
+};
+
+export const updateAdAdmin = async (payload: { id: number; shortUrl?: string; imageUrl?: string; isActive?: boolean }): Promise<{ success: boolean }> => {
+  try { await auth.currentUser?.getIdToken(true); } catch {}
+  const res = await updateAdAdminCallable(payload);
+  return res.data as any;
+};
+
+export const deleteAdAdmin = async (id: number): Promise<{ success: boolean }> => {
+  try { await auth.currentUser?.getIdToken(true); } catch {}
+  const res = await deleteAdAdminCallable({ id });
+  return res.data as any;
 };
 
 export const deletePuzzlesBatchAdmin = async (ids: number[]): Promise<{ success: boolean }> => {

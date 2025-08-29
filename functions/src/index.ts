@@ -503,9 +503,18 @@ export const uploadImageAdmin = functions.https.onCall(async (data: any, context
     const bucket = admin.storage().bucket();
     const file = bucket.file(path);
     const buffer = Buffer.from(base64, 'base64');
-    await file.save(buffer, { contentType, resumable: false, public: true, metadata: { cacheControl: 'public, max-age=31536000' } });
+    const token = randomBytes(16).toString('hex');
+    await file.save(buffer, {
+      contentType,
+      resumable: false,
+      public: true,
+      metadata: {
+        cacheControl: 'public, max-age=31536000',
+        metadata: { firebaseStorageDownloadTokens: token },
+      },
+    });
     const encodedName = encodeURIComponent(path);
-    const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodedName}?alt=media`;
+    const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodedName}?alt=media&token=${token}`;
     return { success: true, url: publicUrl };
   } catch (error) {
     functions.logger.error('Error in uploadImageAdmin:', error);
@@ -961,5 +970,105 @@ export const fixCommentCounts = functions.https.onCall(async (_data, _context) =
   } catch (error) {
     functions.logger.error('Error in fixCommentCounts:', error);
     throw new functions.https.HttpsError('internal', 'Failed to fix comment counts');
+  }
+});
+
+/**
+ * Ads: Public fetch of active ads. Returns simple metadata for client rendering.
+ */
+export const getAds = functions.https.onCall(async (_data, _context) => {
+  try {
+    const snap = await db.collection('ads').where('isActive', '==', true).get();
+    const items = snap.docs.map((doc) => ({ id: (doc.data() as any).id, ...doc.data() }));
+    items.sort((a: any, b: any) => Number(a.id) - Number(b.id));
+    // Ensure only safe public fields
+    return items.map((it: any) => ({ id: Number(it.id), shortUrl: String(it.shortUrl || ''), imageUrl: String(it.imageUrl || ''), isActive: Boolean(it.isActive) }));
+  } catch (error) {
+    functions.logger.error('getAds error', error);
+    throw new functions.https.HttpsError('internal', 'Failed to fetch ads');
+  }
+});
+
+/** Admin: Fetch all ads */
+export const getAllAdsAdmin = functions.https.onCall(async (_data, context) => {
+  assertIsAdmin(context);
+  try {
+    const snap = await db.collection('ads').get();
+    const items = snap.docs.map((doc) => ({ docId: doc.id, ...doc.data() }));
+    items.sort((a: any, b: any) => Number(a.id) - Number(b.id));
+    return { items };
+  } catch (error) {
+    functions.logger.error('getAllAdsAdmin error', error);
+    throw new functions.https.HttpsError('internal', 'Failed to fetch ads (admin)');
+  }
+});
+
+/** Admin: Create ad (requires id, shortUrl) */
+export const createAdAdmin = functions.https.onCall(async (data: any, context) => {
+  assertIsAdmin(context);
+  try {
+    const { id, shortUrl, imageUrl, isActive = true } = data || {};
+    if (typeof id === 'undefined' || !shortUrl) {
+      throw new functions.https.HttpsError('invalid-argument', 'id and shortUrl are required');
+    }
+    const exists = await db.collection('ads').where('id', '==', Number(id)).limit(1).get();
+    if (!exists.empty) {
+      throw new functions.https.HttpsError('already-exists', 'An ad with same id already exists');
+    }
+    const payload = {
+      id: Number(id),
+      shortUrl: String(shortUrl),
+      imageUrl: imageUrl ? String(imageUrl) : '',
+      isActive: Boolean(isActive),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    } as any;
+    const ref = await db.collection('ads').add(payload);
+    return { success: true, docId: ref.id };
+  } catch (error) {
+    functions.logger.error('createAdAdmin error', error);
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', 'Failed to create ad');
+  }
+});
+
+/** Admin: Update ad by id */
+export const updateAdAdmin = functions.https.onCall(async (data: any, context) => {
+  assertIsAdmin(context);
+  try {
+    const { id } = data || {};
+    if (typeof id === 'undefined') {
+      throw new functions.https.HttpsError('invalid-argument', 'id is required');
+    }
+    const snap = await db.collection('ads').where('id', '==', Number(id)).limit(1).get();
+    if (snap.empty) throw new functions.https.HttpsError('not-found', 'Ad not found');
+    const ref = snap.docs[0].ref;
+    const update: any = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
+    if (typeof data.shortUrl !== 'undefined') update.shortUrl = String(data.shortUrl);
+    if (typeof data.imageUrl !== 'undefined') update.imageUrl = String(data.imageUrl);
+    if (typeof data.isActive !== 'undefined') update.isActive = Boolean(data.isActive);
+    await ref.update(update);
+    return { success: true };
+  } catch (error) {
+    functions.logger.error('updateAdAdmin error', error);
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', 'Failed to update ad');
+  }
+});
+
+/** Admin: Delete ad by id */
+export const deleteAdAdmin = functions.https.onCall(async (data: any, context) => {
+  assertIsAdmin(context);
+  try {
+    const { id } = data || {};
+    if (typeof id === 'undefined') throw new functions.https.HttpsError('invalid-argument', 'id is required');
+    const snap = await db.collection('ads').where('id', '==', Number(id)).limit(1).get();
+    if (snap.empty) throw new functions.https.HttpsError('not-found', 'Ad not found');
+    await snap.docs[0].ref.delete();
+    return { success: true };
+  } catch (error) {
+    functions.logger.error('deleteAdAdmin error', error);
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', 'Failed to delete ad');
   }
 });

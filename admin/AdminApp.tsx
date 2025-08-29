@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { isCurrentUserAdmin, onAuthStateChangedListener, signInWithEmailPassword, signOutCurrentUser } from '../firebase';
 import { uploadImageAdminCallable } from '../firebase';
-import { getAllPuzzlesAdmin, createPuzzleAdmin, updatePuzzleAdmin, deletePuzzleAdmin } from '../api/puzzles';
+import { getAllPuzzlesAdmin, createPuzzleAdmin, updatePuzzleAdmin, deletePuzzleAdmin, getAllAdsAdmin, createAdAdmin, updateAdAdmin, deleteAdAdmin } from '../api/puzzles';
 import type { PublicPuzzle } from '../types';
 import { adminFetchBoardPosts, adminUpdateBoardPost, adminDeleteBoardPost } from '../api/board';
 
@@ -12,7 +12,7 @@ const AdminApp: React.FC = () => {
   const { t } = useTranslation();
   const [isAuthed, setIsAuthed] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [adminTab, setAdminTab] = useState<'puzzles' | 'board'>('puzzles');
+  const [adminTab, setAdminTab] = useState<'puzzles' | 'board' | 'ads'>('puzzles');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -23,6 +23,10 @@ const AdminApp: React.FC = () => {
   const [loadingBoard, setLoadingBoard] = useState(false);
   const [isBoardEditOpen, setIsBoardEditOpen] = useState(false);
   const [boardEditDraft, setBoardEditDraft] = useState<any | null>(null);
+  // Ads
+  const [ads, setAds] = useState<any[]>([]);
+  const [newAd, setNewAd] = useState<any>({ id: '', shortUrl: '', imageUrl: '', isActive: true });
+  const [adEdit, setAdEdit] = useState<any | null>(null);
   const [newPuzzle, setNewPuzzle] = useState<any>({
     id: '',
     imageUrl: '',
@@ -83,6 +87,7 @@ const AdminApp: React.FC = () => {
       if (user && admin) {
         void fetchPuzzles();
         void fetchBoardAdmin();
+        void fetchAdsAdmin();
       } else {
         setPuzzles([]);
         setBoardPosts([]);
@@ -122,6 +127,22 @@ const AdminApp: React.FC = () => {
       setLoadingBoard(false);
     }
   };
+
+  const fetchAdsAdmin = async () => {
+    setError(null);
+    try {
+      const res = await getAllAdsAdmin();
+      setAds(res as any[]);
+    } catch (e: any) {
+      setError(e.message || 'Failed to load ads');
+    }
+  };
+
+  // Auto-generate next ad id when ads list changes
+  useEffect(() => {
+    const nextId = (ads.length ? Math.max(...ads.map((a: any) => Number(a?.id) || 0)) : 0) + 1;
+    setNewAd((s: any) => ({ ...s, id: String(nextId) }));
+  }, [ads]);
 
   const openEdit = (p: AdminPuzzle) => {
     setEditDraft({ ...p } as AdminPuzzle);
@@ -227,12 +248,16 @@ const AdminApp: React.FC = () => {
       <div className="container mx-auto p-4">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">{t('admin_panel')}</h1>
-          <button onClick={handleLogout} className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">{t('logout')}</button>
+          <div className="flex items-center gap-2">
+            <a href="/play" className="bg-cyan-600 hover:bg-cyan-700 px-4 py-2 rounded text-white">플레이로 이동</a>
+            <button onClick={handleLogout} className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded">{t('logout')}</button>
+          </div>
         </div>
         {/* Tabs */}
         <div className="mb-4 inline-flex rounded-lg border border-gray-700 overflow-hidden">
           <button className={`${adminTab==='puzzles' ? 'bg-cyan-600 text-white' : 'bg-gray-800 text-gray-300'} px-4 py-2`} onClick={() => setAdminTab('puzzles')}>퍼즐</button>
           <button className={`${adminTab==='board' ? 'bg-cyan-600 text-white' : 'bg-gray-800 text-gray-300'} px-4 py-2 border-l border-gray-700`} onClick={() => setAdminTab('board')}>게시판</button>
+          <button className={`${adminTab==='ads' ? 'bg-cyan-600 text-white' : 'bg-gray-800 text-gray-300'} px-4 py-2 border-l border-gray-700`} onClick={() => setAdminTab('ads')}>광고</button>
         </div>
         {error && <div className="mb-3 text-sm text-red-400">{error}</div>}
         {adminTab === 'puzzles' ? (
@@ -326,7 +351,7 @@ const AdminApp: React.FC = () => {
               </form>
             </div>
           </div>
-        ) : (
+        ) : adminTab === 'board' ? (
           <div className="grid grid-cols-1 gap-6">
             <div className="flex items-center justify-between mb-2">
               <h2 className="font-semibold">게시판 글 관리</h2>
@@ -350,6 +375,42 @@ const AdminApp: React.FC = () => {
                 ))}
               </div>
             )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <div className="xl:col-span-2">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="font-semibold">광고 목록</h2>
+                <button onClick={fetchAdsAdmin} className="text-sm bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded">Reload</button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {ads.map((a) => (
+                  <div key={a.id} className={`bg-gray-800 border ${a.isActive ? 'border-cyan-600/40' : 'border-gray-700'} rounded-xl p-3 space-y-2`}>
+                    {a.imageUrl && (
+                      <img src={a.imageUrl} alt="ad" className="w-full h-28 object-cover rounded" />
+                    )}
+                    <div className="text-sm">ID: {a.id}</div>
+                    <div className="text-xs break-all text-cyan-300">{a.shortUrl}</div>
+                    <div className="text-xs">활성: {String(Boolean(a.isActive))}</div>
+                    <div className="flex gap-2">
+                      <button className="text-sm bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded" onClick={() => setAdEdit({ ...a })}>편집</button>
+                      <button className="text-sm bg-red-700 hover:bg-red-600 px-3 py-1 rounded" onClick={async () => { try { await deleteAdAdmin(Number(a.id)); await fetchAdsAdmin(); } catch (e:any) { setError(e.message || 'Delete failed'); } }}>삭제</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
+              <h2 className="font-semibold mb-3">새 광고</h2>
+              <form onSubmit={async (e) => { e.preventDefault(); try { await createAdAdmin({ id: Number(newAd.id), shortUrl: String(newAd.shortUrl), isActive: Boolean(newAd.isActive) } as any); await updateAdAdmin({ id: Number(newAd.id), imageUrl: String(newAd.imageUrl || '') }); setNewAd((s:any) => ({ ...s, shortUrl: '', imageUrl: '' })); await fetchAdsAdmin(); } catch (err:any) { setError(err.message || 'Create ad failed'); } }} className="space-y-2">
+                <input className="w-full px-3 py-2 bg-gray-800 rounded opacity-70 cursor-not-allowed" placeholder="id(자동)" value={newAd.id} readOnly disabled />
+                <input className="w-full px-3 py-2 bg-gray-700 rounded" placeholder="쿠팡 단축 URL" value={newAd.shortUrl} onChange={(e) => setNewAd((s:any) => ({ ...s, shortUrl: e.target.value }))} />
+                <input className="w-full px-3 py-2 bg-gray-700 rounded" placeholder="이미지 URL" value={newAd.imageUrl} onChange={(e) => setNewAd((s:any) => ({ ...s, imageUrl: e.target.value }))} />
+                <input type="file" accept="image/*" className="w-full" onChange={async (e) => { const file = e.target.files?.[0]; if (!file) return; setLoading(true); try { const url = await uploadFileAndGetUrl(file, 'ads'); setNewAd((s:any) => ({ ...s, imageUrl: url })); } catch (err:any) { setError(err.message || 'Upload failed'); } finally { setLoading(false); } }} />
+                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(newAd.isActive)} onChange={(e) => setNewAd((s:any) => ({ ...s, isActive: e.target.checked }))} /> 활성화</label>
+                <button className="w-full bg-cyan-600 hover:bg-cyan-700 py-2 rounded font-semibold">생성</button>
+              </form>
+            </div>
           </div>
         )}
         {/* Puzzle Edit Modal */}
@@ -483,6 +544,36 @@ const AdminApp: React.FC = () => {
               <div className="mt-4 flex items-center justify-end gap-2">
                 <button className="bg-red-700 hover:bg-red-600 px-3 py-2 rounded text-sm" onClick={async () => { try { await adminDeleteBoardPost(String(boardEditDraft.id)); setIsBoardEditOpen(false); await fetchBoardAdmin(); } catch (e:any) { setError(e.message || 'Delete failed'); } }}>삭제</button>
                 <button className="bg-green-700 hover:bg-green-600 px-3 py-2 rounded text-sm" onClick={async () => { try { await adminUpdateBoardPost({ id: String(boardEditDraft.id), title: boardEditDraft.title, content: boardEditDraft.content, category: boardEditDraft.category, isPinned: Boolean(boardEditDraft.isPinned) }); setIsBoardEditOpen(false); await fetchBoardAdmin(); } catch (e:any) { setError(e.message || 'Save failed'); } }}>저장</button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Ad Edit Modal */}
+        {adEdit && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setAdEdit(null)}>
+            <div className="w-full max-w-md bg-gray-800 border border-gray-700 rounded-xl p-4" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold">광고 편집</h3>
+                <button className="text-sm bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded" onClick={() => setAdEdit(null)}>Close</button>
+              </div>
+              <label className="text-xs opacity-80 block mb-2">ID
+                <input className="w-full px-3 py-2 bg-gray-700 rounded" value={String(adEdit.id)} disabled />
+              </label>
+              <label className="text-xs opacity-80 block mb-2">단축 URL
+                <input className="w-full px-3 py-2 bg-gray-700 rounded" value={String(adEdit.shortUrl || '')} onChange={(e) => setAdEdit((s:any) => ({ ...s, shortUrl: e.target.value }))} />
+              </label>
+              <label className="text-xs opacity-80 block mb-2">이미지 URL
+                <input className="w-full px-3 py-2 bg-gray-700 rounded" value={String(adEdit.imageUrl || '')} onChange={(e) => setAdEdit((s:any) => ({ ...s, imageUrl: e.target.value }))} />
+              </label>
+              <input type="file" accept="image/*" className="w-full mb-3" onChange={async (e) => { const file = e.target.files?.[0]; if (!file) return; setLoading(true); try { const url = await uploadFileAndGetUrl(file, 'ads'); setAdEdit((s:any) => ({ ...s, imageUrl: url })); } catch (err:any) { setError(err.message || 'Upload failed'); } finally { setLoading(false); } }} />
+              <label className="text-xs opacity-80 block mb-4">활성화
+                <select className="w-full px-3 py-2 bg-gray-700 rounded" value={String(Boolean(adEdit.isActive))} onChange={(e) => setAdEdit((s:any) => ({ ...s, isActive: e.target.value === 'true' }))}>
+                  <option value="true">true</option>
+                  <option value="false">false</option>
+                </select>
+              </label>
+              <div className="flex items-center justify-end gap-2">
+                <button className="bg-green-700 hover:bg-green-600 px-3 py-2 rounded text-sm" onClick={async () => { try { await updateAdAdmin({ id: Number(adEdit.id), shortUrl: String(adEdit.shortUrl || ''), imageUrl: String(adEdit.imageUrl || ''), isActive: Boolean(adEdit.isActive) }); setAdEdit(null); await fetchAdsAdmin(); } catch (e:any) { setError(e.message || 'Save failed'); } }}>저장</button>
               </div>
             </div>
           </div>

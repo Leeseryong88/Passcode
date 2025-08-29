@@ -1,8 +1,9 @@
 import React, { useState, useEffect, Suspense, useMemo, useCallback } from 'react';
 import type { PublicPuzzle } from './types';
 import PuzzleCard from './components/PuzzleCard';
+import AdCard from './components/AdCard';
 import Header from './components/Header';
-import { getPublicPuzzles, getSolvedAnswer } from './api/puzzles';
+import { getPublicPuzzles, getSolvedAnswer, getPublicAds } from './api/puzzles';
 import { LoaderCircle } from 'lucide-react';
 import SupportCard from './components/SupportCard';
 import { useTranslation } from 'react-i18next';
@@ -17,6 +18,7 @@ const App: React.FC = () => {
   const [puzzles, setPuzzles] = useState<PublicPuzzle[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [ads, setAds] = useState<{ id: number; shortUrl: string; imageUrl?: string }[]>([]);
   const [activeFilter, setActiveFilter] = useState<FilterType>(() => {
     const saved = localStorage.getItem('activeFilter');
     return (saved as FilterType) || 'unsolved';
@@ -26,7 +28,10 @@ const App: React.FC = () => {
   const fetchPuzzles = useCallback(async () => {
     try {
       setIsLoading(true);
-      const fetchedPuzzles = await getPublicPuzzles();
+      const [fetchedPuzzles, fetchedAds] = await Promise.all([
+        getPublicPuzzles(),
+        getPublicAds().catch(() => []),
+      ]);
       // 해결된 퍼즐인데 목록 응답에 answer가 비어있으면 서버에서 보충 조회
       const enriched = await Promise.all(
         fetchedPuzzles.map(async (p) => {
@@ -44,6 +49,7 @@ const App: React.FC = () => {
         })
       );
       setPuzzles(enriched as any);
+      setAds((fetchedAds as any[]).map((a: any) => ({ id: Number(a.id), shortUrl: String(a.shortUrl || ''), imageUrl: a.imageUrl })));
       setError(null);
     } catch (err) {
       setError(t('failed_to_load_puzzles'));
@@ -127,14 +133,31 @@ const App: React.FC = () => {
           {!isLoading && !error && (
             filteredPuzzles.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
-                {filteredPuzzles.map((puzzle) => (
-                  <PuzzleCard 
-                    key={puzzle.id} 
-                    puzzle={puzzle} 
-                    isSolved={puzzle.isSolved || false}
-                    onSolve={handleSolve}
-                  />
-                ))}
+                {(() => {
+                  const usedAdIds = new Set<number>();
+                  const result: React.ReactNode[] = [];
+                  filteredPuzzles.forEach((puzzle, idx) => {
+                    result.push(
+                      <PuzzleCard
+                        key={`p-${puzzle.id}`}
+                        puzzle={puzzle}
+                        isSolved={puzzle.isSolved || false}
+                        onSolve={handleSolve}
+                      />
+                    );
+                    const insertAd = (idx + 1) % 3 === 0;
+                    if (insertAd && ads.length > 0) {
+                      const available = ads.find((a) => !usedAdIds.has(a.id));
+                      if (available) {
+                        usedAdIds.add(available.id);
+                        result.push(
+                          <AdCard key={`ad-${available.id}`} shortUrl={available.shortUrl} imageUrl={available.imageUrl} />
+                        );
+                      }
+                    }
+                  });
+                  return result;
+                })()}
                 {!hasActiveUnsolved && (
                   <SupportCard walletAddress={supportWalletAddress} />
                 )}
