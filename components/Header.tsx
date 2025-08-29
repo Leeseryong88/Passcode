@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Award, Globe, Shield, Menu, X } from 'lucide-react';
+import { Award, Globe, Shield, Menu, X, Instagram } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { isCurrentUserAdmin } from '../firebase';
 
@@ -47,6 +47,15 @@ const Header: React.FC = () => {
           <a href="/about" className="hidden sm:inline px-3 py-2 text-gray-300 hover:text-white transition-colors">{t('nav_about') || 'About'}</a>
           <a href="/board" className="hidden sm:inline px-3 py-2 text-gray-300 hover:text-white transition-colors">{t('nav_board') || 'Board'}</a>
           <a href="/play" className="hidden sm:inline px-3 py-2 text-gray-300 hover:text-white transition-colors">{t('nav_play') || 'Play'}</a>
+          <a
+            href="https://www.instagram.com/passcode_official?igsh=MWhyNjdiZXZtd3JjZw=="
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden sm:inline-flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white transition-colors"
+            aria-label="Instagram"
+          >
+            <Instagram className="w-5 h-5" />
+          </a>
           {isAdmin && (
             <a href="/admin" className="hidden sm:inline-flex items-center gap-2 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-500 transition-colors">
               <Shield className="w-5 h-5" /> Admin
@@ -76,6 +85,15 @@ const Header: React.FC = () => {
               <a href="/about" className="px-2 py-3 text-gray-200 hover:bg-gray-800 rounded" onClick={() => setIsMenuOpen(false)}>{t('nav_about') || 'About'}</a>
               <a href="/board" className="px-2 py-3 text-gray-200 hover:bg-gray-800 rounded" onClick={() => setIsMenuOpen(false)}>{t('nav_board') || 'Board'}</a>
               <a href="/play" className="px-2 py-3 text-gray-200 hover:bg-gray-800 rounded" onClick={() => setIsMenuOpen(false)}>{t('nav_play') || 'Play'}</a>
+              <a
+                href="https://www.instagram.com/passcode_official?igsh=MWhyNjdiZXZtd3JjZw=="
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-2 py-3 text-gray-200 hover:bg-gray-800 rounded inline-flex items-center gap-2"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <Instagram className="w-5 h-5" /> Instagram
+              </a>
               {isAdmin && (
                 <a href="/admin" className="px-2 py-3 text-gray-200 hover:bg-gray-800 rounded" onClick={() => setIsMenuOpen(false)}>
                   Admin
