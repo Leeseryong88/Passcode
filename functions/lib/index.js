@@ -128,8 +128,8 @@ exports.checkAnswer = functions.https.onCall(async (data, _context) => {
             catch (incErr) {
                 functions.logger.warn('Failed to increment wrongAttempts', incErr);
             }
-            // Use failed-precondition to avoid misleading 401 Unauthorized in network logs
-            throw new functions.https.HttpsError("failed-precondition", "Incorrect answer. Please try again.");
+            // Return typed result instead of throwing so the client doesn't see a 400 in DevTools
+            return { type: 'wrong' };
         }
         // Atomically mark solved only once
         const firstSolver = await db.runTransaction(async (tx) => {

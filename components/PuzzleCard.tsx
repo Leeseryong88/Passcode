@@ -30,6 +30,7 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
   const [infoMessage, setInfoMessage] = useState('');
   const [showAnswer, setShowAnswer] = useState(false);
   const [answerText, setAnswerText] = useState('');
+  const [wrongAttemptsLocal, setWrongAttemptsLocal] = useState<number>((puzzle as any).wrongAttempts || 0);
   const [revealText, setRevealText] = useState('');
   const [showWalletAddress, setShowWalletAddress] = useState(false);
 
@@ -73,10 +74,8 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
     } catch (err: any) {
       setError(err.message || t('incorrect_answer'));
       setGuess('');
-      // Refresh puzzle list to reflect global wrongAttempts increment
-      if (!isReentering) {
-        onSolve();
-      }
+      // 로컬로 즉시 반영하여 UI에 오답 횟수 증가 표시
+      setWrongAttemptsLocal((prev) => prev + 1);
     } finally {
       setIsSubmitting(false);
     }
@@ -143,7 +142,7 @@ const PuzzleCard: React.FC<PuzzleCardProps> = ({ puzzle, isSolved, onSolve }) =>
               )}
             </div>
             <div className="flex items-center justify-end min-h-6">
-              <span className="inline-flex items-center h-6 text-[10px] sm:text-xs font-semibold bg-red-600/20 text-red-300 px-2 rounded">{t('wrong_attempts_count', { count: (puzzle as any).wrongAttempts || 0 })}</span>
+              <span className="inline-flex items-center h-6 text-[10px] sm:text-xs font-semibold bg-red-600/20 text-red-300 px-2 rounded">{t('wrong_attempts_count', { count: wrongAttemptsLocal })}</span>
             </div>
           </div>
           {isSolved && (!puzzle.rewardType || puzzle.rewardType === 'metamask') && (

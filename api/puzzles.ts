@@ -48,13 +48,25 @@ export const checkPuzzleAnswer = async (
   | { type: 'image'; revealImageUrl: string }
   | { type: 'text'; revealText: string }
   | { type: 'already_solved' }
+  | { type: 'wrong' }
 > => {
    try {
     const result = await checkAnswerCallable({ puzzleId, guess });
-    return result.data as any;
+    const data = result.data as any;
+    // 서버가 오답을 200으로 반환하는 경우, 클라이언트에서는 예외로 변환해 동일한 UX 유지
+    if (data && data.type === 'wrong') {
+      const err: any = new Error('Incorrect answer. Please try again.');
+      // 표준 SDK 에러가 아니므로, 우리 쪽에서 식별 가능한 플래그를 추가해 콘솔 노이즈 억제
+      err.expectedWrongAnswer = true;
+      throw err;
+    }
+    return data;
   } catch (error: any) {
     const code = error?.code as string | undefined;
-    const isExpectedWrongAnswer = code === 'functions/failed-precondition' || code === 'functions/unauthenticated';
+    const isExpectedWrongAnswer =
+      code === 'functions/failed-precondition' ||
+      code === 'functions/unauthenticated' ||
+      Boolean((error as any)?.expectedWrongAnswer);
     if (!isExpectedWrongAnswer) {
       console.error("Error calling checkAnswer function:", error);
     }
