@@ -45,7 +45,7 @@ const Header: React.FC = () => {
           {/* Desktop nav */}
           <a href="/" className="hidden sm:inline px-3 py-2 text-gray-300 hover:text-white transition-colors">{t('nav_home') || 'Home'}</a>
           <a href="/about" className="hidden sm:inline px-3 py-2 text-gray-300 hover:text-white transition-colors">{t('nav_about') || 'About'}</a>
-          <a href="/board" className="hidden sm:inline px-3 py-2 text-gray-300 hover:text-white transition-colors">{t('nav_board') || 'Board'}</a>
+          {/* Board link temporarily hidden */}
           <a href="/play" className="hidden sm:inline px-3 py-2 text-gray-300 hover:text-white transition-colors">{t('nav_play') || 'Play'}</a>
           <a
             href="https://www.instagram.com/passcode_official?igsh=MWhyNjdiZXZtd3JjZw=="
@@ -83,7 +83,7 @@ const Header: React.FC = () => {
             <nav className="container mx-auto px-4 py-3 flex flex-col">
               <a href="/" className="px-2 py-3 text-gray-200 hover:bg-gray-800 rounded" onClick={() => setIsMenuOpen(false)}>{t('nav_home') || 'Home'}</a>
               <a href="/about" className="px-2 py-3 text-gray-200 hover:bg-gray-800 rounded" onClick={() => setIsMenuOpen(false)}>{t('nav_about') || 'About'}</a>
-              <a href="/board" className="px-2 py-3 text-gray-200 hover:bg-gray-800 rounded" onClick={() => setIsMenuOpen(false)}>{t('nav_board') || 'Board'}</a>
+              {/* Board link temporarily hidden in mobile menu */}
               <a href="/play" className="px-2 py-3 text-gray-200 hover:bg-gray-800 rounded" onClick={() => setIsMenuOpen(false)}>{t('nav_play') || 'Play'}</a>
               <a
                 href="https://www.instagram.com/passcode_official?igsh=MWhyNjdiZXZtd3JjZw=="

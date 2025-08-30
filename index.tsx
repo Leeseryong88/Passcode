@@ -14,18 +14,20 @@ const SelectedApp = React.lazy(() => {
   if (route.startsWith('/admin')) {
     return import('./admin/AdminApp');
   }
-  if (route.startsWith('/board/new')) {
-    return import('./src/pages/BoardNew');
-  }
+  // Temporarily disable board routes
+  // if (route.startsWith('/board/new')) {
+  //   return import('./src/pages/BoardNew');
+  // }
   if (route === '/') {
     return import('./src/pages/Landing');
   }
   if (route.startsWith('/about')) {
     return import('./src/pages/About');
   }
-  if (route.startsWith('/board')) {
-    return import('./src/pages/Board');
-  }
+  // Temporarily disable board routes
+  // if (route.startsWith('/board')) {
+  //   return import('./src/pages/Board');
+  // }
   if (route.startsWith('/play') || route.startsWith('/app')) {
     return import('./App');
   }
